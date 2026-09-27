@@ -1,0 +1,23 @@
+.empty-state {
+  max-width: 500px;
+  margin: 40px auto;
+  background: white;
+  border: 2px dashed #D1D5DB;
+  border-radius: 16px;
+  padding: 35px 25px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 42px;
+}
+
+.empty-state h3 {
+  color: #1F2937;
+  margin-top: 16px;
+}
+
+.empty-state p {
+  color: #6B7280;
+  margin-top: 10px;
+}
