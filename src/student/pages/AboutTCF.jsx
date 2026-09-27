@@ -3,7 +3,7 @@ import StudentLayout from "../layouts/StudentLayout";
 function Dashboard() {
   return (
     <StudentLayout>
-      <h1>registred events</h1>
+      <h1>About</h1>
     </StudentLayout>
   );
 }
