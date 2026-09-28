@@ -167,3 +167,12 @@ export const notifications = [
     isRead: true
   }
 ];
+export const registrations = [
+  {
+    registrationId: "REG001",
+    studentId: "ST002",
+    eventId: "EV003",
+    registeredAt: "2027-09-27T13:00",
+    status: "registered"
+  }
+];

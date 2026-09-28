@@ -39,6 +39,7 @@ function EventCard({
         <button className="event-button" onClick={onClick}>
           {buttonText}
         </button>
+        
 
       </div>
 

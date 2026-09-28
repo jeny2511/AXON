@@ -6,7 +6,7 @@ import UpcomingEvents from "../pages/UpcomingEvents";
 import RegisteredEvents from "../pages/RegisteredEvents";
 import MyEvents from "../pages/MyEvents";
 import OngoingEvents from "../pages/OngoingEvents";
-import Gallery from "../pages/Gallery";
+import Gallery from "../pages/EventGallery";
 import LearningHub from "../pages/LearningHub";
 import AboutTCF from "../pages/AboutTCF";
 import Notifications from "../pages/Notifications";

@@ -4,6 +4,7 @@ import { events } from "../../mockData/events";
 import { registrations } from "../../mockData/registrations";
 import { certificates } from "../../mockData/certificates";
 import { feedback } from "../../mockData/feedback";
+import { gallery } from "../../mockData/gallery";
 
 // --------------------------------------------
 // EVENTS
@@ -13,15 +14,18 @@ import { feedback } from "../../mockData/feedback";
 export function getAllEvents() {
   return events;
 }
+export function getGallery() {
+  return gallery;
+}
 
 // Get upcoming events
 export function getUpcomingEvents() {
-  return events.filter(event => event.status === "Upcoming");
+  return events.filter((event) => event.status === "upcoming");
 }
 
 // Get ongoing events
 export function getOngoingEvents() {
-  return events.filter(event => event.status === "Ongoing");
+  return events.filter((event) => event.status === "ongoing");
 }
 
 // Get completed events
