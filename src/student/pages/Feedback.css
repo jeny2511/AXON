@@ -111,3 +111,22 @@
 .feedback-actions button:hover {
   opacity: 0.9;
 }
+.feedback-message {
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.feedback-error {
+  background: #fde8e8;
+  color: #b42318;
+  border: 1px solid #f5c2c2;
+}
+
+.feedback-success {
+  background: #dff6ee;
+  color: #187a5a;
+  border: 1px solid #b8e6d5;
+}
