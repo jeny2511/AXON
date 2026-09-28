@@ -1,0 +1,158 @@
+import "./CertificateView.css";
+
+function CertificateView({
+  certificate,
+  studentName,
+  enrollmentNo,
+  eventName,
+  onClose,
+}) {
+  if (!certificate) return null;
+
+  const formattedDate = certificate.issueDate
+    ? new Date(certificate.issueDate).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "Date not available";
+
+  const handleDownload = () => {
+    window.print();
+  };
+
+  return (
+    <div className="certificate-modal">
+      <div className="certificate-modal-content">
+        {/* Top Controls */}
+        <div className="certificate-toolbar">
+          <button
+            type="button"
+            className="certificate-close-btn"
+            onClick={onClose}
+          >
+            ✕ Close
+          </button>
+
+          <button
+            type="button"
+            className="certificate-download-btn"
+            onClick={handleDownload}
+          >
+            ↓ Download Certificate
+          </button>
+        </div>
+
+        {/* Certificate */}
+        <div className="certificate-print-area">
+          <div className="certificate-border">
+            <div className="certificate-inner-border">
+              <div className="certificate-content">
+
+                {/* Header */}
+                <div className="certificate-header">
+                  <div className="certificate-logo">
+                    TCF
+                  </div>
+
+                  <div>
+                    <h2>THE CYBER FORCE</h2>
+                    <p>Vishwakarma Government Engineering College</p>
+                  </div>
+                </div>
+
+                <div className="certificate-divider" />
+
+                {/* Title */}
+                <div className="certificate-title-section">
+                  <p className="certificate-small-title">
+                    CERTIFICATE OF PARTICIPATION
+                  </p>
+
+                  <h1>Certificate of Participation</h1>
+
+                  <p className="certificate-subtitle">
+                    This certificate is proudly presented to
+                  </p>
+                </div>
+
+                {/* Student */}
+                <div className="certificate-student">
+                  <h2>{studentName}</h2>
+
+                  <div className="certificate-underline" />
+
+                  <p>
+                    Enrollment No. <strong>{enrollmentNo}</strong>
+                  </p>
+                </div>
+
+                {/* Event */}
+                <div className="certificate-description">
+                  <p>
+                    for actively participating in
+                  </p>
+
+                  <h3>{certificate.certificateTitle}</h3>
+
+                  {eventName && (
+                    <p className="certificate-event-name">
+                      Event: <strong>{eventName}</strong>
+                    </p>
+                  )}
+                </div>
+
+                {/* Date + Verification */}
+                <div className="certificate-details">
+                  <div className="certificate-detail">
+                    <span>DATE OF ISSUE</span>
+                    <strong>{formattedDate}</strong>
+                  </div>
+
+                  <div className="certificate-detail">
+                    <span>VERIFICATION CODE</span>
+                    <strong>{certificate.verificationCode}</strong>
+                  </div>
+                </div>
+
+                {/* Signatures */}
+                <div className="certificate-signatures">
+                  <div className="signature">
+                    <div className="signature-line" />
+                    <strong>TCF Coordinator</strong>
+                    <span>The Cyber Force</span>
+                  </div>
+
+                  <div className="certificate-seal">
+                    TCF
+                    <span>VERIFIED</span>
+                  </div>
+
+                  <div className="signature">
+                    <div className="signature-line" />
+                    <strong>Faculty Coordinator</strong>
+                    <span>VGEC</span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="certificate-footer">
+                  <span>Certificate ID: {certificate.certificateId}</span>
+                  <span>THE CYBER FORCE • VGEC</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p className="certificate-print-note">
+          Click "Download Certificate" and choose <strong>Save as PDF</strong>
+          in the print window.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default CertificateView;

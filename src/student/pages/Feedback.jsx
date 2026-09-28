@@ -3,7 +3,6 @@ import "./Feedback.css";
 import StudentLayout from "../layouts/StudentLayout";
 
 function Feedback() {
-    
   const [formData, setFormData] = useState({
     overallRating: "",
     contentRating: "",
@@ -41,6 +40,23 @@ function Feedback() {
       return;
     }
 
+    const feedbackData = {
+      feedbackId: `FB-${Date.now()}`,
+      studentId: "ST002",
+      eventId: "EV004",
+      overallRating: Number(formData.overallRating),
+      contentRating: Number(formData.contentRating),
+      speakerRating: Number(formData.speakerRating),
+      comment: formData.comment.trim(),
+      wouldRecommend: formData.wouldRecommend,
+      submittedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(
+      "axon_feedback_ST002_EV004",
+      JSON.stringify(feedbackData)
+    );
+
     setError("");
     setSubmitted(true);
   };
@@ -48,7 +64,6 @@ function Feedback() {
   return (
     <StudentLayout>
       <div className="student-page">
-
         <div className="page-header">
           <h1>Event Feedback</h1>
           <p>
@@ -57,10 +72,9 @@ function Feedback() {
         </div>
 
         <div className="feedback-card">
-
           <div className="feedback-event">
-            <h2>Event Name</h2>
-            <p>Event details will appear here.</p>
+            <h2>Smart India Hackathon Internal Round</h2>
+            <p>Share your experience about this event.</p>
           </div>
 
           {error && (
@@ -76,7 +90,6 @@ function Feedback() {
           )}
 
           <form className="feedback-form" onSubmit={handleSubmit}>
-
             <div className="form-group">
               <label htmlFor="overallRating">
                 Overall Rating *
@@ -171,10 +184,8 @@ function Feedback() {
                 Submit Feedback
               </button>
             </div>
-
           </form>
         </div>
-
       </div>
     </StudentLayout>
   );

@@ -1,10 +1,10 @@
 import "./CertificateCard.css";
+
 function CertificateCard({
   title,
   eventName,
   issueDate,
   verificationCode,
-  certificateUrl,
   status,
   onView,
 }) {
@@ -23,7 +23,7 @@ function CertificateCard({
       <p className="certificate-event">{eventName}</p>
 
       <p>
-        <strong>Issue Date:</strong> {issueDate}
+        <strong>Issue Date:</strong> {issueDate || "Not issued yet"}
       </p>
 
       <p>
@@ -31,19 +31,9 @@ function CertificateCard({
       </p>
 
       <div className="certificate-actions">
-        {certificateUrl && (
-          <a
-            href={certificateUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View Certificate
-          </a>
-        )}
-
         {onView && (
           <button type="button" onClick={onView}>
-            View Details
+            View Certificate
           </button>
         )}
       </div>
