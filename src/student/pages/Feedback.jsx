@@ -1,8 +1,14 @@
 import { useState } from "react";
 import "./Feedback.css";
 import StudentLayout from "../layouts/StudentLayout";
+import {
+  getStudentFeedback,
+  hasSubmittedFeedback,
+} from "../services/studentService"
 
 function Feedback() {
+    const studentId = "ST002";
+  const submittedFeedback = getStudentFeedback(studentId);
   const [formData, setFormData] = useState({
     overallRating: "",
     contentRating: "",

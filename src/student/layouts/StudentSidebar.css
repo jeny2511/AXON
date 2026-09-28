@@ -1,14 +1,14 @@
 .student-sidebar {
-  width: 275px;
-  height: 100vh;
-  background: linear-gradient(180deg, #6D28D9 0%, #5B21B6 45%, #4C1D95 100%);
-  color: white;
-  padding: 24px 16px;
-  box-sizing: border-box;
+  width: 250px;
+  min-height: 100vh;          /* At least one screen */
+  background: linear-gradient(180deg, #6D28D9, #4C1D95);
+
   display: flex;
   flex-direction: column;
-}
+  justify-content: space-between;
 
+  flex-shrink: 0;
+}
 /* ---------------- Logo ---------------- */
 
 .sidebar-logo {
@@ -45,9 +45,11 @@
 /* ---------------- Menu ---------------- */
 
 .sidebar-menu {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 20px 12px;
 }
 
 .menu-heading {

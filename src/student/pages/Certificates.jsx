@@ -3,14 +3,15 @@ import StudentLayout from "../layouts/StudentLayout";
 import ProgressBar from "../components/ProgressBar";
 import CertificateCard from "../components/CertificateCard";
 import EmptyState from "../components/EmptyState/EmptyState";
+import { getStudentCertificates } from "../services/studentService";
 
 function Certificates() {
-  const certificates = [];
+  const studentId = "ST002";
+  const certificates = getStudentCertificates(studentId);
 
   return (
     <StudentLayout>
       <div className="student-page">
-
         <div className="page-header">
           <h1>My Certificates</h1>
           <p>View and access certificates earned from TCF events.</p>
@@ -28,9 +29,9 @@ function Certificates() {
           {certificates.length > 0 ? (
             certificates.map((certificate) => (
               <CertificateCard
-                key={certificate.id}
-                title={certificate.title}
-                eventName={certificate.eventName}
+                key={certificate.certificateId}
+                title={certificate.certificateTitle}
+                eventName={certificate.eventId}
                 issueDate={certificate.issueDate}
                 verificationCode={certificate.verificationCode}
                 certificateUrl={certificate.certificateUrl}
@@ -44,7 +45,6 @@ function Certificates() {
             />
           )}
         </div>
-
       </div>
     </StudentLayout>
   );
