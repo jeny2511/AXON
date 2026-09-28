@@ -1,7 +1,6 @@
 import { useState } from "react";
 import "./Feedback.css";
 import StudentLayout from "../layouts/StudentLayout";
-import { getStudentFeedback } from "../services/studentService";
 
 function Feedback() {
     
