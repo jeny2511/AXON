@@ -1,0 +1,215 @@
+.my-events-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.my-event-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Certificate + Feedback buttons */
+
+.my-event-extra-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.my-event-extra-actions button {
+  flex: 1;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.certificate-btn {
+  background: #6d28d9;
+  color: white;
+}
+
+.certificate-btn:hover {
+  background: #5b21b6;
+  transform: translateY(-1px);
+}
+
+.feedback-btn {
+  background: #0f766e;
+  color: white;
+}
+
+.feedback-btn:hover {
+  background: #0d5f59;
+  transform: translateY(-1px);
+}
+
+/* Feedback Modal */
+
+.feedback-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 9999;
+}
+
+.feedback-modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.feedback-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  cursor: pointer;
+  color: #555;
+}
+
+.feedback-modal-header {
+  margin-bottom: 22px;
+  padding-right: 30px;
+}
+
+.feedback-modal-header h2 {
+  margin: 0 0 8px;
+  color: #1b1b26;
+}
+
+.feedback-modal-header p {
+  margin: 0;
+  color: #666;
+}
+
+.feedback-field {
+  margin-bottom: 16px;
+}
+
+.feedback-field label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+  color: #333;
+}
+
+.feedback-field select,
+.feedback-field textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.feedback-field select:focus,
+.feedback-field textarea:focus {
+  border-color: #6d28d9;
+}
+
+.feedback-field textarea {
+  resize: vertical;
+}
+
+.recommend-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 15px 0;
+  color: #444;
+  font-size: 14px;
+}
+
+.feedback-error {
+  margin: 10px 0;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.feedback-submit-btn,
+.feedback-done-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #6d28d9;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.feedback-submit-btn:hover,
+.feedback-done-btn:hover {
+  background: #5b21b6;
+}
+
+/* Success */
+
+.feedback-success {
+  text-align: center;
+  padding: 35px 10px;
+}
+
+.success-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: bold;
+}
+
+.feedback-success h2 {
+  margin-bottom: 8px;
+  color: #1b1b26;
+}
+
+.feedback-success p {
+  color: #666;
+  margin-bottom: 22px;
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .my-events-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .my-event-extra-actions {
+    flex-direction: column;
+  }
+
+  .feedback-modal {
+    padding: 22px;
+  }
+}

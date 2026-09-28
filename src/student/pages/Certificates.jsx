@@ -1,13 +1,29 @@
+import { useState } from "react";
 import "./Certificates.css";
 import StudentLayout from "../layouts/StudentLayout";
 import ProgressBar from "../components/ProgressBar";
 import CertificateCard from "../components/CertificateCard";
+import CertificateView from "../components/CertificateView";
 import EmptyState from "../components/EmptyState/EmptyState";
-import { getStudentCertificates } from "../services/studentService";
+import {
+  getStudentCertificates,
+  getEventById,
+} from "../services/studentService";
 
 function Certificates() {
   const studentId = "ST002";
+
   const certificates = getStudentCertificates(studentId);
+
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
+
+  const handleViewCertificate = (certificate) => {
+    setSelectedCertificate(certificate);
+  };
+
+  const handleCloseCertificate = () => {
+    setSelectedCertificate(null);
+  };
 
   return (
     <StudentLayout>
@@ -27,17 +43,22 @@ function Certificates() {
 
         <div className="certificates-section">
           {certificates.length > 0 ? (
-            certificates.map((certificate) => (
-              <CertificateCard
-                key={certificate.certificateId}
-                title={certificate.certificateTitle}
-                eventName={certificate.eventId}
-                issueDate={certificate.issueDate}
-                verificationCode={certificate.verificationCode}
-                certificateUrl={certificate.certificateUrl}
-                status={certificate.status}
-              />
-            ))
+            certificates.map((certificate) => {
+              const event = getEventById(certificate.eventId);
+
+              return (
+                <CertificateCard
+                  key={certificate.certificateId}
+                  title={certificate.certificateTitle}
+                  eventName={event?.title || certificate.eventId}
+                  issueDate={certificate.issueDate}
+                  verificationCode={certificate.verificationCode}
+                  certificateUrl={certificate.certificateUrl}
+                  status={certificate.status}
+                  onView={() => handleViewCertificate(certificate)}
+                />
+              );
+            })
           ) : (
             <EmptyState
               title="No Certificates Available"
@@ -46,6 +67,19 @@ function Certificates() {
           )}
         </div>
       </div>
+
+      {selectedCertificate && (
+        <CertificateView
+          certificate={selectedCertificate}
+          studentName="Archi Patel"
+          enrollmentNo="220130107055"
+          eventName={
+            getEventById(selectedCertificate.eventId)?.title ||
+            selectedCertificate.eventId
+          }
+          onClose={handleCloseCertificate}
+        />
+      )}
     </StudentLayout>
   );
 }

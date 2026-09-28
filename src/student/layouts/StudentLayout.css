@@ -1,18 +1,35 @@
 .student-layout {
   display: flex;
-  min-height: 100vh;        /* Whole page can grow */
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
   background: #F8FAFC;
+  box-sizing: border-box;
 }
 
-.page-content {
+/* Main area beside sidebar */
+.layout-content {
   flex: 1;
-  background: #F8FAFC;
-  padding: 30px;
+  width: calc(100% - 250px);
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
+/* Page area */
 .page-content {
   flex: 1;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
   padding: 32px;
+  box-sizing: border-box;
   overflow-y: auto;
-  background-color: #F8FAFC;
+  background: #F8FAFC;
 }
