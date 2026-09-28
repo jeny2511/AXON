@@ -1,3 +1,4 @@
+import "./Certificates.css";
 import StudentLayout from "../layouts/StudentLayout";
 import ProgressBar from "../components/ProgressBar";
 import EmptyState from "../components/EmptyState/EmptyState";

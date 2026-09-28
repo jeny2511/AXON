@@ -1,3 +1,4 @@
+import "./RegisteredEvents.css";
 import StudentLayout from "../layouts/StudentLayout";
 import EmptyState from "../components/EmptyState/EmptyState";
 
