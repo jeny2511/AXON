@@ -14,7 +14,16 @@ function EventCard({
   return (
     <div className="event-card">
 
-      <img src={poster} alt={title} className="event-poster" />
+      {poster && (
+  <img
+    src={poster}
+    alt={title}
+    className="event-poster"
+    onError={(e) => {
+      e.target.style.display = "none";
+    }}
+  />
+)}
 
       <div className="event-content">
 
