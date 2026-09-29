@@ -143,16 +143,6 @@
   color: #ffffff;
 }
 
-.menu-icon {
-  width: 16px;
-
-  display: flex;
-  justify-content: center;
-
-  font-size: 13px;
-  line-height: 1;
-}
-
 .menu-text {
   font-size: 11px;
 }

@@ -8,6 +8,7 @@ import { gallery } from "../../mockData/gallery";
 import { aboutTCF } from "../../mockData/about";
 import { notifications } from "../../mockData/notifications";
 import { learning } from "../../mockData/learning";
+import { users } from "../../mockData/users";
 
 
 // --------------------------------------------
@@ -194,3 +195,9 @@ export function getStudentNotifications(studentId) {
   );
 }
 
+// PROFILE
+export function getStudentProfile(studentId) {
+  return users.find(
+    user => user.id === studentId && user.role === "student"
+  );
+}
