@@ -2,13 +2,35 @@ import "./RegisteredEvents.css";
 import StudentLayout from "../layouts/StudentLayout";
 import EmptyState from "../components/EmptyState/EmptyState";
 import EventCard from "../components/EventCard/EventCard";
-import { getStudentRegistrations, getEventById } from "../services/studentService";
+import {
+  getStudentRegistrations,
+  getEventById,
+} from "../services/studentService";
 
 function RegisteredEvents() {
   const studentId = "ST002";
-  const registrations = getStudentRegistrations(studentId);
 
-  const registeredEvents = registrations
+  // Existing registrations from mock data
+  const serviceRegistrations = getStudentRegistrations(studentId);
+
+  // Registrations created from Upcoming Events
+  const localRegistrations = JSON.parse(
+    localStorage.getItem(`axon_registrations_${studentId}`) || "[]"
+  );
+
+  // Combine both sources without duplicate events
+  const allRegistrations = [
+    ...serviceRegistrations,
+    ...localRegistrations.filter(
+      (localRegistration) =>
+        !serviceRegistrations.some(
+          (serviceRegistration) =>
+            serviceRegistration.eventId === localRegistration.eventId
+        )
+    ),
+  ];
+
+  const registeredEvents = allRegistrations
     .map((registration) => getEventById(registration.eventId))
     .filter(Boolean);
 
@@ -26,10 +48,10 @@ function RegisteredEvents() {
               {registeredEvents.map((event) => (
                 <EventCard
                   key={event.id}
-                  title={event.title}
+                  title={event.name}
                   poster={event.poster}
-                  date={event.date}
-                  time={event.time}
+                  date={event.eventDate}
+                  time={`${event.startTime} - ${event.endTime}`}
                   venue={event.venue}
                   description={event.description}
                   status={event.status}

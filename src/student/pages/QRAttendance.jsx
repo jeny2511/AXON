@@ -2,6 +2,8 @@ import { useState } from "react";
 import "./QRAttendance.css";
 
 function QRAttendance({ event }) {
+  const studentId = "ST002";
+
   const [status, setStatus] = useState("Pending");
 
   const handleScan = () => {
@@ -12,9 +14,62 @@ function QRAttendance({ event }) {
     }, 1500);
 
     setTimeout(() => {
+      markAttendance();
       setStatus("Present");
     }, 3000);
   };
+
+const markAttendance = () => {
+  const storageKey = `axon_registrations_${studentId}`;
+
+  const registrations = JSON.parse(
+    localStorage.getItem(storageKey) || "[]"
+  );
+
+  const existingRegistration = registrations.find(
+    (registration) => registration.eventId === event?.id
+  );
+
+  let updatedRegistrations;
+
+  if (existingRegistration) {
+    updatedRegistrations = registrations.map((registration) => {
+      if (registration.eventId === event?.id) {
+        return {
+          ...registration,
+          status: "attended",
+          attendanceStatus: "present",
+          attendedAt: new Date().toISOString(),
+        };
+      }
+
+      return registration;
+    });
+  } else {
+    updatedRegistrations = [
+      ...registrations,
+      {
+        registrationId: `REG-${Date.now()}`,
+        studentId: studentId,
+        eventId: event.id,
+        registeredAt: new Date().toISOString(),
+        status: "attended",
+        attendanceStatus: "present",
+        attendedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify(updatedRegistrations)
+  );
+
+  // Tell other pages that registration/attendance changed
+  window.dispatchEvent(
+    new Event("axon-registration-updated")
+  );
+};
 
   return (
     <div className="qr-attendance-card">
@@ -31,6 +86,7 @@ function QRAttendance({ event }) {
       {status === "Pending" && (
         <div className="qr-placeholder">
           <div className="qr-icon">▦</div>
+
           <p>Ready to scan event QR</p>
 
           <button type="button" onClick={handleScan}>
@@ -56,8 +112,16 @@ function QRAttendance({ event }) {
       {status === "Present" && (
         <div className="attendance-success">
           <div className="success-icon">✓</div>
+
           <h3>Attendance Marked Successfully</h3>
-          <p>Your attendance status is now Present.</p>
+
+          <p>
+            Your attendance status is now Present.
+          </p>
+
+          <p>
+            This event is now available in My Events.
+          </p>
         </div>
       )}
     </div>
