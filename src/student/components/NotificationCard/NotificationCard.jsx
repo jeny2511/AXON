@@ -4,10 +4,14 @@ function NotificationCard({
   title,
   message,
   type,
-  isRead
+  isRead,
+  onClick,
 }) {
   return (
-    <div className={`notification-card ${isRead ? "read" : "unread"}`}>
+    <div
+  className={`notification-card ${isRead ? "read" : "unread"}`}
+  onClick={onClick}
+>
 
       <div className="notification-content">
 
