@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import VolunteerLayout from "../layouts/VolunteerLayout";
 import Dashboard from "../pages/Dashboard";
+import ManageEvents from "../pages/ManageEvents";
 
 function AppRoutes() {
   return (
@@ -11,14 +12,22 @@ function AppRoutes() {
         element={<Navigate to="/volunteer" replace />}
       />
 
+      {/* Direct path support */}
+      <Route
+        path="/events"
+        element={<Navigate to="/volunteer/events" replace />}
+      />
+
       {/* Volunteer Module */}
       <Route path="/volunteer" element={<VolunteerLayout />}>
-
         {/* Dashboard */}
         <Route index element={<Dashboard />} />
 
-        {/* Other pages - content will be added later */}
-        <Route path="events" element={null} />
+        {/* Events */}
+        <Route path="events" element={<ManageEvents />} />
+
+        {/* Other pages */}
+        <Route path="volunteers" element={<Dashboard />} />
         <Route path="registrations" element={null} />
         <Route path="feedback" element={null} />
         <Route path="gallery" element={null} />
@@ -29,7 +38,6 @@ function AppRoutes() {
         <Route path="learning" element={null} />
         <Route path="notifications" element={null} />
         <Route path="profile" element={null} />
-
       </Route>
     </Routes>
   );

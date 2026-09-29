@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
@@ -7,18 +8,20 @@ function VolunteerLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f9]">
+    <div className="min-h-screen bg-[#f8f9fb] text-gray-800 antialiased">
+      {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      <div className="min-h-screen lg:ml-[230px]">
+      {/* Main content area */}
+      <div className="flex min-h-screen flex-col lg:ml-[240px]">
         <Topbar
           onMenuClick={() => setSidebarOpen(true)}
         />
 
-        <main className="p-5 lg:p-6">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

@@ -1,4 +1,4 @@
-export const notifications = [
+export const registrations = [
   // =========================
   // JENY (ST001)
   // =========================
