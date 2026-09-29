@@ -1,169 +1,145 @@
-export const notifications = [
+export const registrations = [
   // =========================
-  // JENY (ST001)
+  // JENY'S REGISTRATIONS
   // =========================
-
   {
-    notificationId: "NOT001",
-    userId: "ST001",
+    registrationId: "REG001",
+    studentId: "ST001",
     eventId: "EV001",
-    type: "registration",
-    title: "Registration Successful",
-    message:
-      "You have successfully registered for Capture The Flag 2027. See you on 23 October!",
-    createdAt: "2027-10-12T14:25",
-    isRead: true
+    registrationDate: "2027-10-12T14:20",
+    status: "registered",
+    qrCode: "QR-EV001-ST001"
   },
 
   {
-    notificationId: "NOT002",
-    userId: "ST001",
-    eventId: "EV001",
-    type: "deadline",
-    title: "Registration Closing Soon",
-    message:
-      "Registration for Capture The Flag 2027 closes today at 11:59 PM.",
-    createdAt: "2027-10-22T09:00",
-    isRead: false
-  },
-
-  {
-    notificationId: "NOT003",
-    userId: "ST001",
-    eventId: "EV003",
-    type: "attendance",
-    title: "Attendance Window Open",
-    message:
-      "Linux & Kali Hands-on Workshop has started. Scan your QR code before 4:10 PM to mark attendance.",
-    createdAt: "2027-09-27T14:00",
-    isRead: false
-  },
-
-  {
-    notificationId: "NOT004",
-    userId: "ST001",
+    registrationId: "REG002",
+    studentId: "ST001",
     eventId: "EV002",
-    type: "reminder",
-    title: "Upcoming Event Reminder",
-    message:
-      "Bug Bounty Bootcamp starts tomorrow at 10:00 AM in Computer Lab 3.",
-    createdAt: "2027-10-29T18:00",
-    isRead: false
+    registrationDate: "2027-10-18T11:15",
+    status: "registered",
+    qrCode: "QR-EV002-ST001"
   },
 
   {
-    notificationId: "NOT005",
-    userId: "ST001",
-    eventId: "EV005",
-    type: "feedback",
-    title: "Feedback Required",
-    message:
-      "Please submit your feedback for Phishing Awareness Session to unlock your certificate.",
-    createdAt: "2027-08-05T15:00",
-    isRead: true
+    registrationId: "REG003",
+    studentId: "ST001",
+    eventId: "EV003",
+    registrationDate: "2027-09-20T09:10",
+    status: "registered",
+    qrCode: "QR-EV003-ST001"
   },
 
   {
-    notificationId: "NOT006",
-    userId: "ST001",
+    registrationId: "REG004",
+    studentId: "ST001",
     eventId: "EV004",
-    type: "certificate",
-    title: "Certificate Available",
-    message:
-      "Your Smart India Hackathon Internal Round certificate is now available to download.",
-    createdAt: "2027-08-20T09:30",
-    isRead: false
-  },
-
-  // =========================
-  // ARCHI (ST002)
-  // =========================
-
-  {
-    notificationId: "NOT007",
-    userId: "ST002",
-    eventId: "EV003",
-    type: "attendance",
-    title: "Attendance Window Open",
-    message:
-      "Linux & Kali Hands-on Workshop is live. Mark your attendance using the QR code.",
-    createdAt: "2027-09-27T14:02",
-    isRead: false
+    registrationDate: "2027-08-05T13:40",
+    status: "registered",
+    qrCode: "QR-EV004-ST001"
   },
 
   {
-    notificationId: "NOT008",
-    userId: "ST002",
+    registrationId: "REG005",
+    studentId: "ST001",
+    eventId: "EV005",
+    registrationDate: "2027-07-30T18:05",
+    status: "registered",
+    qrCode: "QR-EV005-ST001"
+  },
+
+  // =========================
+  // ARCHI
+  // =========================
+  {
+    registrationId: "REG006",
+    studentId: "ST002",
     eventId: "EV001",
-    type: "reminder",
-    title: "Event Reminder",
-    message:
-      "Capture The Flag 2027 begins tomorrow at 2:00 PM. Don't forget to bring your laptop.",
-    createdAt: "2027-10-22T19:00",
-    isRead: false
+    registrationDate: "2027-10-11T10:25",
+    status: "registered",
+    qrCode: "QR-EV001-ST002"
+  },
+
+  {
+    registrationId: "REG007",
+    studentId: "ST002",
+    eventId: "EV003",
+    registrationDate: "2027-09-22T15:30",
+    status: "registered",
+    qrCode: "QR-EV003-ST002"
   },
 
   // =========================
-  // RIYA (ST003)
+  // RIYA
   // =========================
-
   {
-    notificationId: "NOT009",
-    userId: "ST003",
+    registrationId: "REG008",
+    studentId: "ST003",
     eventId: "EV002",
-    type: "registration",
-    title: "Registration Cancelled",
-    message:
-      "Your registration for Bug Bounty Bootcamp has been cancelled successfully.",
-    createdAt: "2027-10-17T10:45",
-    isRead: true
+    registrationDate: "2027-10-16T12:00",
+    status: "cancelled",
+    qrCode: null
+  },
+
+  {
+    registrationId: "REG009",
+    studentId: "ST003",
+    eventId: "EV005",
+    registrationDate: "2027-07-29T17:15",
+    status: "registered",
+    qrCode: "QR-EV005-ST003"
   },
 
   // =========================
-  // MEET (ST004)
+  // MEET
   // =========================
+  {
+    registrationId: "REG010",
+    studentId: "ST004",
+    eventId: "EV004",
+    registrationDate: "2027-08-03T09:40",
+    status: "registered",
+    qrCode: "QR-EV004-ST004"
+  },
 
   {
-    notificationId: "NOT010",
-    userId: "ST004",
+    registrationId: "REG011",
+    studentId: "ST004",
     eventId: "EV006",
-    type: "reschedule",
-    title: "Event Rescheduled",
-    message:
-      "Web Security Masterclass timing has changed to 10:30 AM – 3:30 PM.",
-    createdAt: "2027-11-03T12:15",
-    isRead: false
+    registrationDate: "2027-10-25T10:00",
+    status: "registered",
+    qrCode: "QR-EV006-ST004"
   },
 
   // =========================
-  // KRISHNA (ST005)
+  // KRISHNA
   // =========================
-
   {
-    notificationId: "NOT011",
-    userId: "ST005",
+    registrationId: "REG012",
+    studentId: "ST005",
     eventId: "EV007",
-    type: "registration",
-    title: "Waitlisted",
-    message:
-      "Network Security Challenge is currently full. You've been added to the waitlist.",
-    createdAt: "2027-11-03T08:50",
-    isRead: false
+    registrationDate: "2027-11-03T08:45",
+    status: "waitlisted",
+    qrCode: null
+  },
+
+  {
+    registrationId: "REG013",
+    studentId: "ST005",
+    eventId: "EV008",
+    registrationDate: "2027-11-05T14:30",
+    status: "registered",
+    qrCode: "QR-EV008-ST005"
   },
 
   // =========================
-  // HARSH (ST006)
+  // HARSH
   // =========================
-
   {
-    notificationId: "NOT012",
-    userId: "ST006",
+    registrationId: "REG014",
+    studentId: "ST006",
     eventId: "EV002",
-    type: "registration",
-    title: "Registration Successful",
-    message:
-      "You're successfully registered for Bug Bounty Bootcamp.",
-    createdAt: "2027-10-19T11:25",
-    isRead: true
+    registrationDate: "2027-10-19T11:20",
+    status: "registered",
+    qrCode: "QR-EV002-ST006"
   }
 ];
