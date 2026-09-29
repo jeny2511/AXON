@@ -146,33 +146,5 @@ export const users = [
     semester: 5,
     profilePhoto: "/assets/images/profile/ishika.jpg",
     isActive: true
-  },
-
-  {
-    id: "AD002",
-    role: "admin",
-    fullName: "Dhrumi Shah",
-    enrollmentNo: "220130109002",
-    email: "dhrumi@vgec.ac.in",
-    phone: "9876543231",
-    department: "IT",
-    year: 3,
-    semester: 5,
-    profilePhoto: "/assets/images/profile/dhrumi.jpg",
-    isActive: true
-  },
-
-  {
-    id: "AD003",
-    role: "admin",
-    fullName: "Prof. Om Mehta",
-    enrollmentNo: "FAC001",
-    email: "om.mehta@vgec.ac.in",
-    phone: "9876543232",
-    department: "Cyber Security Cell",
-    year: null,
-    semester: null,
-    profilePhoto: "/assets/images/profile/faculty.jpg",
-    isActive: true
   }
 ];

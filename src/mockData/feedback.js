@@ -88,7 +88,7 @@ export const feedback = [
     comment:
       "Good event overall. More time for project presentations would have been helpful.",
 
-    isAnonymous: true
+    isAnonymous: false
   },
 
   // =========================
@@ -112,6 +112,6 @@ export const feedback = [
     comment:
       "The session was useful, but the auditorium audio quality made it difficult to follow parts of the talk.",
 
-    isAnonymous: true
+    isAnonymous: false
   }
 ];

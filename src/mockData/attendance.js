@@ -65,10 +65,10 @@ export const attendance = [
     attendanceId: "ATT006",
     studentId: "ST003",
     eventId: "EV005",
-    status: "absent",
-    attendanceTime: null,
-    method: null,
-    verifiedBy: null
+    status: "present",
+    attendanceTime: "2027-08-05T11:08",
+    method: "QR",
+    verifiedBy: "VL002"
   },
 
   // =========================

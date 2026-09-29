@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./pages.css";
 import "./Certificates.css";
 import StudentLayout from "../layouts/StudentLayout";
 import ProgressBar from "../components/ProgressBar";
@@ -6,40 +7,57 @@ import CertificateCard from "../components/CertificateCard";
 import CertificateView from "../components/CertificateView";
 import EmptyState from "../components/EmptyState/EmptyState";
 import {
+  getActiveStudentId,
+  getStudentProfile,
   getStudentCertificates,
+  getStudentCompletedEvents,
   getEventById,
 } from "../services/studentService";
 
 function Certificates() {
-  const studentId = "ST002";
+  const studentId = getActiveStudentId();
+  const student = getStudentProfile(studentId) || {
+    id: studentId,
+    fullName: "Student",
+    enrollmentNo: "220130107054",
+  };
 
   const certificates = getStudentCertificates(studentId);
+  const attendedEvents = getStudentCompletedEvents(studentId);
 
   const [selectedCertificate, setSelectedCertificate] = useState(null);
 
   const handleViewCertificate = (certificate) => {
-    setSelectedCertificate(certificate);
+    const event = getEventById(certificate.eventId);
+    setSelectedCertificate({
+      ...certificate,
+      eventName: event ? event.name : certificate.eventId,
+    });
   };
 
   const handleCloseCertificate = () => {
     setSelectedCertificate(null);
   };
 
+  const totalPossible = attendedEvents.length > 0 ? attendedEvents.length : certificates.length;
+
   return (
     <StudentLayout>
-      <div className="student-page">
-        <div className="page-header">
-          <h1>My Certificates</h1>
-          <p>View and access certificates earned from TCF events.</p>
+      <div className="certificates-page">
+        <div className="page-container">
+          <h1 className="page-title">My Certificates</h1>
+          <p className="page-subtitle">View and access certificates earned from attended TCF events.</p>
         </div>
 
-        <div className="certificate-progress">
-          <ProgressBar
-            current={certificates.length}
-            total={certificates.length}
-            label="Certificates Available"
-          />
-        </div>
+        {certificates.length > 0 && (
+          <div className="certificate-progress">
+            <ProgressBar
+              current={certificates.length}
+              total={totalPossible || 1}
+              label="Certificates Issued vs Attended Events"
+            />
+          </div>
+        )}
 
         <div className="certificates-section">
           {certificates.length > 0 ? (
@@ -50,10 +68,8 @@ function Certificates() {
                 <CertificateCard
                   key={certificate.certificateId}
                   title={certificate.certificateTitle}
-                  eventName={event?.title || certificate.eventId}
+                  eventName={event?.name || certificate.eventId}
                   issueDate={certificate.issueDate}
-                  verificationCode={certificate.verificationCode}
-                  certificateUrl={certificate.certificateUrl}
                   status={certificate.status}
                   onView={() => handleViewCertificate(certificate)}
                 />
@@ -61,8 +77,8 @@ function Certificates() {
             })
           ) : (
             <EmptyState
-              title="No Certificates Available"
-              message="Certificates earned from eligible events will appear here."
+              title="No Certificates Issued Yet"
+              message="Certificates will appear here once your attendance at eligible events is marked and verified."
             />
           )}
         </div>
@@ -71,12 +87,9 @@ function Certificates() {
       {selectedCertificate && (
         <CertificateView
           certificate={selectedCertificate}
-          studentName="Archi Patel"
-          enrollmentNo="220130107055"
-          eventName={
-            getEventById(selectedCertificate.eventId)?.title ||
-            selectedCertificate.eventId
-          }
+          studentName={student.fullName}
+          enrollmentNo={student.enrollmentNo || "220130107054"}
+          eventName={selectedCertificate.eventName}
           onClose={handleCloseCertificate}
         />
       )}

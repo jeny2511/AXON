@@ -58,7 +58,7 @@ export const notifications = [
     type: "feedback",
     title: "Feedback Required",
     message:
-      "Please submit your feedback for Phishing Awareness Session to unlock your certificate.",
+      "Please submit your feedback for Phishing Awareness Session to share your experience.",
     createdAt: "2027-08-05T15:00",
     isRead: true
   },
@@ -144,9 +144,9 @@ export const notifications = [
     userId: "ST005",
     eventId: "EV007",
     type: "registration",
-    title: "Waitlisted",
+    title: "Registration Confirmed",
     message:
-      "Network Security Challenge is currently full. You've been added to the waitlist.",
+      "You have successfully registered for Network Security Challenge. See you on 15 November!",
     createdAt: "2027-11-03T08:50",
     isRead: false
   },

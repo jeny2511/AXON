@@ -1,13 +1,17 @@
 import { useState } from "react";
 import StudentLayout from "../layouts/StudentLayout";
-import { getStudentProfile } from "../services/studentService";
+import {
+  getActiveStudentId,
+  getStudentProfile,
+  updateStudentProfile,
+} from "../services/studentService";
 import "./Profile.css";
 
 function Profile() {
-  const studentId = "ST001";
-  const student = getStudentProfile(studentId);
-
+  const [studentId] = useState(() => getActiveStudentId());
+  const [student, setStudent] = useState(() => getStudentProfile(studentId));
   const [isEditing, setIsEditing] = useState(false);
+  const [message, setMessage] = useState(null); // { type: "success" | "error", text: string }
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
@@ -17,32 +21,55 @@ function Profile() {
     confirmPassword: "",
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     fullName: student?.fullName || "",
     email: student?.email || "",
     phone: student?.phone || "",
-  });
+  }));
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
   };
 
   const handleSave = () => {
+    if (!formData.fullName.trim() || !formData.email.trim()) {
+      setMessage({ type: "error", text: "Name and email are required fields." });
+      return;
+    }
+
+    const updated = updateStudentProfile(studentId, {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+    });
+
+    setStudent(updated);
+    setIsEditing(false);
+    setMessage({ type: "success", text: "Profile details updated successfully!" });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  const handleCancelEdit = () => {
+    if (student) {
+      setFormData({
+        fullName: student.fullName || "",
+        email: student.email || "",
+        phone: student.phone || "",
+      });
+    }
     setIsEditing(false);
   };
 
   const handlePasswordChange = (event) => {
     const { name, value } = event.target;
-
-    setPasswordData({
-      ...passwordData,
+    setPasswordData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
   };
 
   const handlePasswordUpdate = () => {
@@ -51,21 +78,22 @@ function Profile() {
       !passwordData.newPassword ||
       !passwordData.confirmPassword
     ) {
-      alert("Please fill all password fields.");
+      setMessage({ type: "error", text: "Please fill all password fields." });
       return;
     }
 
     if (passwordData.newPassword.length < 8) {
-      alert("New password must be at least 8 characters.");
+      setMessage({ type: "error", text: "New password must be at least 8 characters long." });
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert("New password and confirm password do not match.");
+      setMessage({ type: "error", text: "New password and confirmation do not match." });
       return;
     }
 
-    alert("Password updated successfully.");
+    setMessage({ type: "success", text: "Account password updated successfully!" });
+    setTimeout(() => setMessage(null), 4000);
 
     setPasswordData({
       currentPassword: "",
@@ -80,7 +108,24 @@ function Profile() {
     <StudentLayout>
       <div className="profile-page">
         <h1 className="page-title">My Profile</h1>
-        <p className="page-subtitle">View your student information.</p>
+        <p className="page-subtitle">View and manage your student academic information.</p>
+
+        {message && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: "8px",
+              marginBottom: "18px",
+              fontSize: "14px",
+              fontWeight: "500",
+              backgroundColor: message.type === "success" ? "#e6f9f0" : "#feebee",
+              color: message.type === "success" ? "#00875a" : "#de350b",
+              border: `1px solid ${message.type === "success" ? "#abf5d1" : "#ffbdad"}`,
+            }}
+          >
+            {message.text}
+          </div>
+        )}
 
         {student && (
           <div className="profile-card">
@@ -95,20 +140,19 @@ function Profile() {
                     }}
                   />
                 ) : (
-                  <span>{student.fullName.charAt(0)}</span>
+                  <span>{student.fullName ? student.fullName.charAt(0) : "S"}</span>
                 )}
               </div>
 
               <div>
                 <h2>{student.fullName}</h2>
-                <p>{student.department} Department</p>
+                <p>{student.department} Department • {student.year}</p>
               </div>
             </div>
 
             <div className="profile-details">
               <div className="profile-field">
-                <span>Name</span>
-
+                <span>Full Name</span>
                 {isEditing ? (
                   <input
                     type="text"
@@ -122,8 +166,12 @@ function Profile() {
               </div>
 
               <div className="profile-field">
-                <span>Email</span>
+                <span>Enrollment No. (Read-Only)</span>
+                <p>{student.enrollmentNo || student.studentId || "N/A"}</p>
+              </div>
 
+              <div className="profile-field">
+                <span>Email Address</span>
                 {isEditing ? (
                   <input
                     type="email"
@@ -137,8 +185,7 @@ function Profile() {
               </div>
 
               <div className="profile-field">
-                <span>Phone</span>
-
+                <span>Phone Number</span>
                 {isEditing ? (
                   <input
                     type="tel"
@@ -147,7 +194,7 @@ function Profile() {
                     onChange={handleChange}
                   />
                 ) : (
-                  <p>{student.phone}</p>
+                  <p>{student.phone || "Not provided"}</p>
                 )}
               </div>
 
@@ -157,13 +204,18 @@ function Profile() {
               </div>
 
               <div className="profile-field">
-                <span>Year</span>
-                <p>{student.year}</p>
+                <span>Academic Year & Semester</span>
+                <p>{student.year} (Semester {student.semester})</p>
               </div>
 
               <div className="profile-field">
-                <span>Semester</span>
-                <p>{student.semester}</p>
+                <span>Batch</span>
+                <p>{student.batch || "2023-2027"}</p>
+              </div>
+
+              <div className="profile-field">
+                <span>Student ID</span>
+                <p>{student.studentId || student.id}</p>
               </div>
 
               <div className="profile-actions">
@@ -172,10 +224,9 @@ function Profile() {
                     <button className="save-button" onClick={handleSave}>
                       Save Changes
                     </button>
-
                     <button
                       className="cancel-button"
-                      onClick={() => setIsEditing(false)}
+                      onClick={handleCancelEdit}
                     >
                       Cancel
                     </button>
@@ -194,7 +245,7 @@ function Profile() {
                 <div className="password-header">
                   <div>
                     <h2>Change Password</h2>
-                    <p>Update your account password.</p>
+                    <p>Update your account login password.</p>
                   </div>
 
                   <button
@@ -212,16 +263,18 @@ function Profile() {
                       <input
                         type="password"
                         name="currentPassword"
+                        placeholder="Enter current password"
                         value={passwordData.currentPassword}
                         onChange={handlePasswordChange}
                       />
                     </div>
 
                     <div className="password-field">
-                      <label>New Password</label>
+                      <label>New Password (min. 8 characters)</label>
                       <input
                         type="password"
                         name="newPassword"
+                        placeholder="Enter new password"
                         value={passwordData.newPassword}
                         onChange={handlePasswordChange}
                       />
@@ -232,6 +285,7 @@ function Profile() {
                       <input
                         type="password"
                         name="confirmPassword"
+                        placeholder="Re-enter new password"
                         value={passwordData.confirmPassword}
                         onChange={handlePasswordChange}
                       />

@@ -4,7 +4,6 @@ function CertificateCard({
   title,
   eventName,
   issueDate,
-  verificationCode,
   status,
   onView,
 }) {
@@ -24,10 +23,6 @@ function CertificateCard({
 
       <p>
         <strong>Issue Date:</strong> {issueDate || "Not issued yet"}
-      </p>
-
-      <p>
-        <strong>Verification Code:</strong> {verificationCode}
       </p>
 
       <div className="certificate-actions">

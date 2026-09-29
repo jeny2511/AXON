@@ -68,6 +68,15 @@ export const registrations = [
     qrCode: "QR-EV003-ST002"
   },
 
+  {
+    registrationId: "REG015",
+    studentId: "ST002",
+    eventId: "EV004",
+    registrationDate: "2027-08-04T11:20",
+    status: "registered",
+    qrCode: "QR-EV004-ST002"
+  },
+
   // =========================
   // RIYA
   // =========================
@@ -118,8 +127,8 @@ export const registrations = [
     studentId: "ST005",
     eventId: "EV007",
     registrationDate: "2027-11-03T08:45",
-    status: "waitlisted",
-    qrCode: null
+    status: "registered",
+    qrCode: "QR-EV007-ST005"
   },
 
   {

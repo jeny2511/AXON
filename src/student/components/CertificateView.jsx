@@ -102,7 +102,7 @@ function CertificateView({
                   )}
                 </div>
 
-                {/* Date + Verification */}
+                {/* Date */}
                 <div className="certificate-details">
                   <div className="certificate-detail">
                     <span>DATE OF ISSUE</span>
@@ -110,8 +110,8 @@ function CertificateView({
                   </div>
 
                   <div className="certificate-detail">
-                    <span>VERIFICATION CODE</span>
-                    <strong>{certificate.verificationCode}</strong>
+                    <span>STATUS</span>
+                    <strong>Verified & Issued</strong>
                   </div>
                 </div>
 
@@ -130,7 +130,7 @@ function CertificateView({
 
                   <div className="signature">
                     <div className="signature-line" />
-                    <strong>Faculty Coordinator</strong>
+                    <strong>TCF Mentor</strong>
                     <span>VGEC</span>
                   </div>
                 </div>

@@ -1,28 +1,49 @@
 import { useState } from "react";
+import "./pages.css";
 import "./MyEvents.css";
 
 import StudentLayout from "../layouts/StudentLayout";
 import EventCard from "../components/EventCard/EventCard";
 import EmptyState from "../components/EmptyState/EmptyState";
 import CertificateView from "../components/CertificateView";
-import { registrations } from "../../mockData/registrations";
 
 import {
+  getActiveStudentId,
+  getStudentProfile,
   getStudentRegistrations,
   getEventById,
+  getStudentAttendanceForEvent,
+  getStudentCertificateForEvent,
+  hasSubmittedFeedback,
+  submitStudentFeedback,
 } from "../services/studentService";
 
 function MyEvents() {
-  const studentId = "ST002";
+  const studentId = getActiveStudentId();
+  const student = getStudentProfile(studentId) || {
+    id: studentId,
+    fullName: "Student",
+    enrollmentNo: "220130107054",
+  };
 
   const registrations = getStudentRegistrations(studentId);
 
   const myEvents = registrations
-    .map((registration) => getEventById(registration.eventId))
+    .map((registration) => {
+      const event = getEventById(registration.eventId);
+      if (!event) return null;
+      return {
+        ...event,
+        registrationId: registration.registrationId,
+        registrationStatus: registration.status,
+        qrCode: registration.qrCode,
+      };
+    })
     .filter(Boolean);
 
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [selectedFeedbackEvent, setSelectedFeedbackEvent] = useState(null);
+  const [selectedQREvent, setSelectedQREvent] = useState(null);
 
   const [feedbackData, setFeedbackData] = useState({
     overallRating: "",
@@ -35,23 +56,27 @@ function MyEvents() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackError, setFeedbackError] = useState("");
 
-  // Certificate
+  // Open Certificate for specific event
   const handleCertificate = (event) => {
-    setSelectedCertificate({
-      certificateId: "CERT003",
-      certificateTitle:
-        "Smart India Hackathon Internal Round - Participation Certificate",
-      certificateUrl: "/assets/certificates/CERT003.pdf",
-      verificationCode: "AXON-SIH-ST002-2027",
-      issueDate: "2027-08-20",
-      eventId: event.id,
-    });
+    const cert = getStudentCertificateForEvent(student.id, event.id);
+    if (cert) {
+      setSelectedCertificate({
+        ...cert,
+        eventName: event.name,
+      });
+    }
   };
 
-  // Feedback
+  // Open QR Token Modal
+  const handleViewQR = (event) => {
+    setSelectedQREvent(event);
+  };
+
+  // Open Feedback Modal for specific event
   const handleFeedback = (event) => {
     setSelectedFeedbackEvent(event);
-    setFeedbackSubmitted(false);
+    const alreadyDone = hasSubmittedFeedback(student.id, event.id);
+    setFeedbackSubmitted(alreadyDone);
     setFeedbackError("");
 
     setFeedbackData({
@@ -65,17 +90,15 @@ function MyEvents() {
 
   const handleFeedbackChange = (event) => {
     const { name, value, type, checked } = event.target;
-
-    setFeedbackData((previous) => ({
-      ...previous,
+    setFeedbackData((prev) => ({
+      ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-
     setFeedbackError("");
   };
 
-  const handleFeedbackSubmit = (event) => {
-    event.preventDefault();
+  const handleFeedbackSubmit = (e) => {
+    e.preventDefault();
 
     if (
       !feedbackData.overallRating ||
@@ -83,28 +106,11 @@ function MyEvents() {
       !feedbackData.speakerRating ||
       !feedbackData.comment.trim()
     ) {
-      setFeedbackError(
-        "Please complete all required fields before submitting."
-      );
+      setFeedbackError("Please complete all required rating and comment fields.");
       return;
     }
 
-    const feedback = {
-      feedbackId: `FB-${Date.now()}`,
-      studentId: studentId,
-      eventId: selectedFeedbackEvent.id,
-      overallRating: Number(feedbackData.overallRating),
-      contentRating: Number(feedbackData.contentRating),
-      speakerRating: Number(feedbackData.speakerRating),
-      comment: feedbackData.comment.trim(),
-      wouldRecommend: feedbackData.wouldRecommend,
-      submittedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      `axon_feedback_${studentId}_${selectedFeedbackEvent.id}`,
-      JSON.stringify(feedback)
-    );
+    submitStudentFeedback(student.id, selectedFeedbackEvent.id, feedbackData);
 
     setFeedbackError("");
     setFeedbackSubmitted(true);
@@ -118,96 +124,221 @@ function MyEvents() {
 
   return (
     <StudentLayout>
-      <div className="student-page">
-        <div className="page-header">
-          <h1>My Events</h1>
-          <p>View the events you have registered for and attended.</p>
+      <div className="my-events-page">
+        <div className="page-container">
+          <h1 className="page-title">My Events</h1>
+          <p className="page-subtitle">
+            View your registrations, attendance QR, feedback, and earned certificates.
+          </p>
         </div>
 
         {myEvents.length > 0 ? (
           <div className="my-events-grid">
             {myEvents.map((event) => {
-  const registration = registrations.find(
-    (item) => item.eventId === event.id
-  );
+              const attRecord = getStudentAttendanceForEvent(student.id, event.id);
+              const attendanceStatus = attRecord ? attRecord.status : "pending";
+              const cert = getStudentCertificateForEvent(student.id, event.id);
+              const isPresent = attendanceStatus === "present";
+              const feedbackDone = hasSubmittedFeedback(student.id, event.id);
 
-  return (
-              <div className="my-event-wrapper" key={event.id}>
-                <EventCard
-                  title={event.name}
-                  poster={event.poster}
-                  date={event.eventDate}
-                  time={`${event.startTime} - ${event.endTime}`}
-                  venue={event.venue}
-                  description={event.description}
-                  status={event.status}
-                  buttonText="View Event"
-                />
-                <div className="my-event-status">
-  <span>Attendance:</span>
+              return (
+                <div className="my-event-wrapper" key={event.id || event.registrationId}>
+                  <EventCard
+                    title={event.name}
+                    poster={event.poster}
+                    date={event.eventDate}
+                    time={`${event.startTime} - ${event.endTime}`}
+                    venue={event.venue}
+                    description={event.description}
+                    status={event.status}
+                    buttonText="View Event Details"
+                  />
 
-  <strong
-    className={
-      registration?.attendanceStatus === "present"
-        ? "attendance-present"
-        : "attendance-pending"
-    }
-  >
-    {registration?.attendanceStatus === "present"
-      ? "Present"
-      : "Pending"}
-  </strong>
-</div>
+                  {/* Attendance Context */}
+                  <div className="my-event-status">
+                    <span>Attendance:</span>
+                    <strong
+                      className={
+                        attendanceStatus === "present"
+                          ? "attendance-present"
+                          : attendanceStatus === "absent"
+                          ? "attendance-absent"
+                          : "attendance-pending"
+                      }
+                      style={{
+                        color:
+                          attendanceStatus === "present"
+                            ? "#16a34a"
+                            : attendanceStatus === "absent"
+                            ? "#dc2626"
+                            : "#d97706",
+                      }}
+                    >
+                      {attendanceStatus === "present"
+                        ? "Present ✓"
+                        : attendanceStatus === "absent"
+                        ? "Absent"
+                        : "Pending Scan"}
+                    </strong>
+                  </div>
 
-                <div className="my-event-extra-actions">
-                  <button
-                    type="button"
-                    className="certificate-btn"
-                    onClick={() => handleCertificate(event)}
-                  >
-                    Certificate
-                  </button>
+                  {/* Actions Grid */}
+                  <div className="my-event-extra-actions">
+                    <button
+                      type="button"
+                      className="qr-btn"
+                      style={{
+                        background: "#4f46e5",
+                        color: "#ffffff",
+                        padding: "9px 14px",
+                        borderRadius: "8px",
+                        border: "none",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => handleViewQR(event)}
+                    >
+                      Show QR
+                    </button>
 
-                  <button
-                    type="button"
-                    className="feedback-btn"
-                    onClick={() => handleFeedback(event)}
-                  >
-                    Feedback
-                  </button>
+                    <button
+                      type="button"
+                      className="certificate-btn"
+                      disabled={!isPresent || !cert}
+                      style={{
+                        opacity: isPresent && cert ? 1 : 0.5,
+                        cursor: isPresent && cert ? "pointer" : "not-allowed",
+                      }}
+                      title={
+                        !isPresent
+                          ? "Certificate is available after attendance is verified."
+                          : !cert
+                          ? "Certificate is being prepared."
+                          : "View Certificate"
+                      }
+                      onClick={() => handleCertificate(event)}
+                    >
+                      Certificate
+                    </button>
+
+                    <button
+                      type="button"
+                      className="feedback-btn"
+                      disabled={!isPresent && event.status === "upcoming"}
+                      style={{
+                        opacity: !isPresent && event.status === "upcoming" ? 0.5 : 1,
+                        cursor: !isPresent && event.status === "upcoming" ? "not-allowed" : "pointer",
+                      }}
+                      onClick={() => handleFeedback(event)}
+                    >
+                      {feedbackDone ? "Feedback ✓" : "Feedback"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-})}
+              );
+            })}
           </div>
         ) : (
           <EmptyState
             title="No Events Yet"
-            message="Your registered and attended events will appear here."
+            message="Your registered and attended events will appear here once you register."
           />
         )}
       </div>
 
-      {/* CERTIFICATE */}
+      {/* QR ATTENDANCE MODAL */}
+      {selectedQREvent && (
+        <div
+          className="feedback-modal-overlay"
+          onClick={() => setSelectedQREvent(null)}
+          style={{ zIndex: 9999 }}
+        >
+          <div
+            className="feedback-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ textAlign: "center", maxWidth: "440px" }}
+          >
+            <button
+              type="button"
+              className="feedback-close"
+              onClick={() => setSelectedQREvent(null)}
+              aria-label="Close"
+            >
+              ×
+            </button>
+
+            <h2 style={{ color: "#1f1f29", marginBottom: "6px" }}>Event Attendance QR</h2>
+            <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>
+              {selectedQREvent.name}
+            </p>
+
+            <div
+              style={{
+                width: "180px",
+                height: "180px",
+                margin: "0 auto 20px",
+                padding: "16px",
+                background: "#f8fafc",
+                borderRadius: "16px",
+                border: "2px dashed #6a3bc5",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div style={{ fontSize: "64px", color: "#6a3bc5", lineHeight: 1 }}>▦</div>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "#4f46e5", marginTop: "8px" }}>
+                {selectedQREvent.qrCode || `QR-${selectedQREvent.id}-${student.id}`}
+              </span>
+            </div>
+
+            <div
+              style={{
+                background: "#f1f5f9",
+                borderRadius: "10px",
+                padding: "12px",
+                fontSize: "13px",
+                color: "#334155",
+                textAlign: "left",
+                marginBottom: "16px",
+              }}
+            >
+              <p style={{ margin: "4px 0" }}>
+                <strong>Student:</strong> {student.fullName}
+              </p>
+              <p style={{ margin: "4px 0" }}>
+                <strong>Enrollment No:</strong> {student.enrollmentNo || "220130107054"}
+              </p>
+              <p style={{ margin: "4px 0" }}>
+                <strong>Event Date:</strong> {selectedQREvent.eventDate}
+              </p>
+            </div>
+
+            <p style={{ fontSize: "12px", color: "#777", margin: 0 }}>
+              Show this QR code to the Volunteer at the event venue to mark your attendance.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* CERTIFICATE MODAL */}
       {selectedCertificate && (
         <CertificateView
           certificate={selectedCertificate}
-          studentName="Archi Patel"
-          enrollmentNo="220130107055"
-          eventName="Smart India Hackathon Internal Round"
+          studentName={student.fullName}
+          enrollmentNo={student.enrollmentNo || "220130107054"}
+          eventName={selectedCertificate.eventName}
           onClose={() => setSelectedCertificate(null)}
         />
       )}
 
-      {/* FEEDBACK */}
+      {/* FEEDBACK MODAL */}
       {selectedFeedbackEvent && (
-        <div className="feedback-modal-overlay">
-          <div className="feedback-modal">
-            <button
-              type="button"
-              className="feedback-close"
-              onClick={closeFeedback}
-            >
+        <div className="feedback-modal-overlay" onClick={closeFeedback}>
+          <div className="feedback-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="feedback-close" onClick={closeFeedback} aria-label="Close">
               ×
             </button>
 
@@ -215,9 +346,7 @@ function MyEvents() {
               <>
                 <div className="feedback-modal-header">
                   <h2>Event Feedback</h2>
-                  <p>
-                    {selectedFeedbackEvent.name}
-                  </p>
+                  <p>{selectedFeedbackEvent.name}</p>
                 </div>
 
                 <form onSubmit={handleFeedbackSubmit}>
@@ -254,7 +383,7 @@ function MyEvents() {
                   </div>
 
                   <div className="feedback-field">
-                    <label>Speaker Rating *</label>
+                    <label>Speaker / Instructor Rating *</label>
                     <select
                       name="speakerRating"
                       value={feedbackData.speakerRating}
@@ -270,12 +399,12 @@ function MyEvents() {
                   </div>
 
                   <div className="feedback-field">
-                    <label>Comments *</label>
+                    <label>Comments & Suggestions *</label>
                     <textarea
                       name="comment"
                       value={feedbackData.comment}
                       onChange={handleFeedbackChange}
-                      placeholder="Share your experience..."
+                      placeholder="Share your experience and feedback..."
                       rows="4"
                     />
                   </div>
@@ -287,17 +416,12 @@ function MyEvents() {
                       checked={feedbackData.wouldRecommend}
                       onChange={handleFeedbackChange}
                     />
-                    Would you recommend this event?
+                    Would you recommend this event to fellow students?
                   </label>
 
-                  {feedbackError && (
-                    <p className="feedback-error">{feedbackError}</p>
-                  )}
+                  {feedbackError && <p className="feedback-error">{feedbackError}</p>}
 
-                  <button
-                    type="submit"
-                    className="feedback-submit-btn"
-                  >
+                  <button type="submit" className="feedback-submit-btn">
                     Submit Feedback
                   </button>
                 </form>
@@ -305,18 +429,9 @@ function MyEvents() {
             ) : (
               <div className="feedback-success">
                 <div className="success-icon">✓</div>
-
                 <h2>Feedback Submitted!</h2>
-
-                <p>
-                  Thank you for sharing your experience.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={closeFeedback}
-                  className="feedback-done-btn"
-                >
+                <p>Thank you for sharing your experience. Your feedback has been recorded.</p>
+                <button type="button" onClick={closeFeedback} className="feedback-done-btn">
                   Done
                 </button>
               </div>

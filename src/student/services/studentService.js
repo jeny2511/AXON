@@ -1,81 +1,208 @@
 // Student Shared Service
-import { attendance } from "../../mockData/attendance";
-import { events } from "../../mockData/events";
-import { registrations } from "../../mockData/registrations";
-import { certificates } from "../../mockData/certificates";
-import { feedback } from "../../mockData/feedback";
-import { gallery } from "../../mockData/gallery";
-import { aboutTCF } from "../../mockData/about";
-import { notifications } from "../../mockData/notifications";
-import { learning } from "../../mockData/learning";
-import { users } from "../../mockData/users";
+import { attendance as mockAttendance } from "../../mockData/attendance";
+import { events as mockEvents } from "../../mockData/events";
+import { registrations as mockRegistrations } from "../../mockData/registrations";
+import { certificates as mockCertificates } from "../../mockData/certificates";
+import { feedback as mockFeedback } from "../../mockData/feedback";
+import { gallery as mockGallery } from "../../mockData/gallery";
+import { aboutTCF as mockAboutTCF } from "../../mockData/about";
+import { notifications as mockNotifications } from "../../mockData/notifications";
+import { learning as mockLearning } from "../../mockData/learning";
+import { users as mockUsers } from "../../mockData/users";
 
+// Default active student (can be stored in localStorage for demo)
+export function getActiveStudentId() {
+  return localStorage.getItem("axon_active_student_id") || "ST001";
+}
+
+export function setActiveStudentId(studentId) {
+  localStorage.setItem("axon_active_student_id", studentId);
+}
 
 // --------------------------------------------
 // EVENTS
 // --------------------------------------------
 
-// Get all events
 export function getAllEvents() {
-  return events;
+  return mockEvents;
 }
+
 export function getGallery() {
-  return gallery;
+  return mockGallery;
 }
 
-// Get upcoming events
 export function getUpcomingEvents() {
-  return events.filter((event) => event.status === "upcoming");
+  return mockEvents.filter((event) => event.status === "upcoming");
 }
 
-// Get ongoing events
 export function getOngoingEvents() {
-  return events.filter((event) => event.status === "ongoing");
+  return mockEvents.filter((event) => event.status === "ongoing");
 }
 
-// Get completed events
 export function getCompletedEvents() {
-  return events.filter(event => event.status === "completed");
+  return mockEvents.filter((event) => event.status === "completed");
 }
 
-// Get one event by ID
 export function getEventById(eventId) {
-  return events.find(event => event.id === eventId);
+  return mockEvents.find((event) => event.id === eventId);
 }
 
 // --------------------------------------------
 // REGISTRATIONS
 // --------------------------------------------
 
-// Get all registrations of one student
+// Get stored custom registrations or fallback to mock registrations
+function getAllRegistrations() {
+  const stored = localStorage.getItem("axon_custom_registrations");
+  if (stored) {
+    try {
+      const custom = JSON.parse(stored);
+      return [...mockRegistrations, ...custom];
+    } catch {
+      return mockRegistrations;
+    }
+  }
+  return mockRegistrations;
+}
+
 export function getStudentRegistrations(studentId) {
-  return registrations.filter(
-    registration => registration.studentId === studentId
+  const allRegs = getAllRegistrations();
+  return allRegs.filter((reg) => reg.studentId === studentId);
+}
+
+export function isStudentRegistered(studentId, eventId) {
+  const studentRegs = getStudentRegistrations(studentId);
+  return studentRegs.some(
+    (reg) => reg.eventId === eventId && reg.status === "registered"
   );
+}
+
+// Check the 4 mandatory business rules for registration eligibility
+export function checkRegistrationEligibility(event, student) {
+  if (!event || !student) {
+    return { eligible: false, reason: "Invalid event or student data." };
+  }
+
+  // 1. Is event open for registration?
+  if (event.registrationStatus !== "open") {
+    return {
+      eligible: false,
+      reason:
+        event.registrationStatus === "full"
+          ? "Event registration is full."
+          : "Event registration is closed.",
+    };
+  }
+
+  // 2. Has registration deadline passed?
+  if (event.registrationClose) {
+    const closeDate = new Date(event.registrationClose);
+    const now = new Date();
+    if (now > closeDate) {
+      return { eligible: false, reason: "Registration deadline has passed." };
+    }
+  }
+
+  // 3. Has capacity been reached?
+  if (
+    event.participantLimit &&
+    event.registeredCount &&
+    event.registeredCount >= event.participantLimit
+  ) {
+    return { eligible: false, reason: "Event has reached maximum capacity." };
+  }
+
+  // 4. Branch eligibility
+  if (
+    event.eligibleDepartments &&
+    !event.eligibleDepartments.includes("ALL") &&
+    !event.eligibleDepartments.includes(student.department)
+  ) {
+    return {
+      eligible: false,
+      reason: `Event is restricted to ${event.eligibleDepartments.join(", ")} department(s).`,
+    };
+  }
+
+  // 5. Academic year eligibility
+  if (
+    event.eligibleYears &&
+    student.year &&
+    !event.eligibleYears.includes(student.year)
+  ) {
+    return {
+      eligible: false,
+      reason: `Event is restricted to Year ${event.eligibleYears.join(", ")} students.`,
+    };
+  }
+
+  // 6. Already registered?
+  if (isStudentRegistered(student.id, event.id)) {
+    return { eligible: false, reason: "You are already registered for this event." };
+  }
+
+  return { eligible: true, reason: "" };
+}
+
+// Register for an event
+export function registerStudentForEvent(studentId, eventId) {
+  const newReg = {
+    registrationId: `REG-${Date.now()}`,
+    studentId: studentId,
+    eventId: eventId,
+    registrationDate: new Date().toISOString(),
+    status: "registered",
+    qrCode: `QR-${eventId}-${studentId}`,
+  };
+
+  const stored = localStorage.getItem("axon_custom_registrations");
+  let custom = [];
+  if (stored) {
+    try {
+      custom = JSON.parse(stored);
+    } catch {
+      custom = [];
+    }
+  }
+  custom.push(newReg);
+  localStorage.setItem("axon_custom_registrations", JSON.stringify(custom));
+
+  return newReg;
 }
 
 // Get full registered event details
 export function getRegisteredEvents(studentId) {
   const studentRegistrations = getStudentRegistrations(studentId);
 
-  return studentRegistrations.map(registration => {
-    const event = getEventById(registration.eventId);
+  return studentRegistrations
+    .map((registration) => {
+      const event = getEventById(registration.eventId);
+      if (!event) return null;
 
-    return {
-      ...registration,
-      ...event,
-    };
-  });
+      return {
+        ...event,
+        registrationId: registration.registrationId,
+        registrationDate: registration.registrationDate,
+        registrationStatus: registration.status,
+        qrCode: registration.qrCode,
+      };
+    })
+    .filter(Boolean);
 }
 
 // --------------------------------------------
 // CERTIFICATES
 // --------------------------------------------
 
-// Get student certificates
 export function getStudentCertificates(studentId) {
-  return certificates.filter(
-    certificate => certificate.studentId === studentId
+  return mockCertificates.filter(
+    (certificate) => certificate.studentId === studentId
+  );
+}
+
+export function getStudentCertificateForEvent(studentId, eventId) {
+  return mockCertificates.find(
+    (cert) => cert.studentId === studentId && cert.eventId === eventId
   );
 }
 
@@ -83,47 +210,72 @@ export function getStudentCertificates(studentId) {
 // FEEDBACK
 // --------------------------------------------
 
-// Get feedback submitted by student
 export function getStudentFeedback(studentId) {
-  return feedback.filter(
-    item => item.studentId === studentId
+  return mockFeedback.filter((item) => item.studentId === studentId);
+}
+
+export function hasSubmittedFeedback(studentId, eventId) {
+  const localSaved = localStorage.getItem(
+    `axon_feedback_${studentId}_${eventId}`
+  );
+  if (localSaved) return true;
+
+  return mockFeedback.some(
+    (item) => item.studentId === studentId && item.eventId === eventId
   );
 }
 
-// Check if feedback already exists
-export function hasSubmittedFeedback(studentId, eventId) {
-  return feedback.some(
-    item =>
-      item.studentId === studentId &&
-      item.eventId === eventId
+export function submitStudentFeedback(studentId, eventId, data) {
+  const feedbackData = {
+    feedbackId: `FB_${studentId}_${eventId}`,
+    studentId,
+    eventId,
+    overallRating: Number(data.overallRating),
+    contentRating: Number(data.contentRating),
+    speakerRating: Number(data.speakerRating),
+    comment: (data.comment || "").trim(),
+    wouldRecommend: Boolean(data.wouldRecommend),
+    submittedAt: new Date().toISOString(),
+    isAnonymous: false,
+  };
+
+  localStorage.setItem(
+    `axon_feedback_${studentId}_${eventId}`,
+    JSON.stringify(feedbackData)
   );
+
+  return feedbackData;
 }
 
 // --------------------------------------------
 // ATTENDANCE
 // --------------------------------------------
 
-// Get attendance records of one student
 export function getStudentAttendance(studentId) {
-  return attendance.filter(
-    item => item.studentId === studentId
+  return mockAttendance.filter((item) => item.studentId === studentId);
+}
+
+export function getStudentAttendanceForEvent(studentId, eventId) {
+  return mockAttendance.find(
+    (item) => item.studentId === studentId && item.eventId === eventId
   );
 }
 
-// Get events attended by one student
+// Get events where student attendance is present
 export function getStudentCompletedEvents(studentId) {
-  const studentAttendance = getStudentAttendance(studentId);
-
-  return studentAttendance.filter(
-    item => item.status === "present"
+  const presentAttendance = mockAttendance.filter(
+    (item) => item.studentId === studentId && item.status === "present"
   );
+
+  return presentAttendance
+    .map((att) => getEventById(att.eventId))
+    .filter(Boolean);
 }
 
 // --------------------------------------------
 // DASHBOARD
 // --------------------------------------------
 
-// Get nearest upcoming event
 export function getNearestUpcomingEvent() {
   const upcomingEvents = getUpcomingEvents();
 
@@ -138,9 +290,10 @@ export function getNearestUpcomingEvent() {
   });
 }
 
-// Dashboard statistics
 export function getDashboardStats(studentId) {
-  const registeredEvents = getStudentRegistrations(studentId);
+  const registeredEvents = getStudentRegistrations(studentId).filter(
+    (r) => r.status === "registered"
+  );
   const completedEvents = getStudentCompletedEvents(studentId);
   const studentCertificates = getStudentCertificates(studentId);
 
@@ -156,48 +309,65 @@ export function getDashboardStats(studentId) {
 // ABOUT TCF
 // --------------------------------------------
 
-// Get TCF information
 export function getAboutTCF() {
-  return aboutTCF;
+  return mockAboutTCF;
 }
 
 // --------------------------------------------
 // LEARNING HUB
 // --------------------------------------------
 
-// Get all learning resources
 export function getLearningResources() {
-  return learning;
+  return mockLearning;
 }
 
-// Get featured learning resources
 export function getFeaturedLearningResources() {
-  return learning.filter(
-    resource => resource.isFeatured === true
-  );
+  return mockLearning.filter((resource) => resource.isFeatured === true);
 }
 
-// Get learning resources by category
 export function getLearningResourcesByCategory(category) {
-  return learning.filter(
-    resource => resource.category === category
-  );
+  if (!category || category === "All") return mockLearning;
+  return mockLearning.filter((resource) => resource.category === category);
 }
 
 // --------------------------------------------
 // NOTIFICATIONS
 // --------------------------------------------
 
-// Get notifications of one student
 export function getStudentNotifications(studentId) {
-  return notifications.filter(
-    notification => notification.userId === studentId
+  return mockNotifications.filter(
+    (notification) => notification.userId === studentId
   );
 }
 
+// --------------------------------------------
 // PROFILE
+// --------------------------------------------
+
 export function getStudentProfile(studentId) {
-  return users.find(
-    user => user.id === studentId && user.role === "student"
+  const stored = localStorage.getItem(`axon_profile_${studentId}`);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      // Fallback
+    }
+  }
+
+  const user = mockUsers.find(
+    (u) => u.id === studentId && u.role === "student"
   );
+  if (!user) return null;
+
+  return {
+    ...user,
+    batch: user.batch || `${2025 - (user.year || 3) + 1}-${2029 - (user.year || 3) + 1}`,
+  };
+}
+
+export function updateStudentProfile(studentId, updatedData) {
+  const current = getStudentProfile(studentId);
+  const merged = { ...current, ...updatedData };
+  localStorage.setItem(`axon_profile_${studentId}`, JSON.stringify(merged));
+  return merged;
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./pages.css";
 import "./OngoingEvents.css";
 import StudentLayout from "../layouts/StudentLayout";
 import EventCard from "../components/EventCard/EventCard";
@@ -20,10 +21,10 @@ function OngoingEvents() {
 
   return (
     <StudentLayout>
-      <div className="student-page">
-        <div className="page-header">
-          <h1>Ongoing Events</h1>
-          <p>Participate in events that are currently active.</p>
+      <div className="ongoing-events-page">
+        <div className="page-container">
+          <h1 className="page-title">Ongoing Events</h1>
+          <p className="page-subtitle">Participate in events that are currently active.</p>
         </div>
 
         {events.length > 0 ? (

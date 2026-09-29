@@ -6,12 +6,18 @@
   padding: 0;
   background: #f7f7fa;
   box-sizing: border-box;
+  position: relative;
+}
+
+/* Backdrop overlay when sidebar is open on smaller screens */
+.sidebar-overlay {
+  display: none;
 }
 
 /* Main area beside sidebar */
 .layout-content {
   flex: 1;
-  width: calc(100% - 250px);
+  width: calc(100% - 230px);
   min-width: 0;
   min-height: 100vh;
   margin: 0;
@@ -32,4 +38,37 @@
   box-sizing: border-box;
   overflow-y: auto;
   background: #f7f7fa;
+}
+
+/* Responsive breakpoint for smaller screens / tablets / mobile */
+@media (max-width: 992px) {
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 10, 35, 0.55);
+    backdrop-filter: blur(2px);
+    z-index: 998;
+    animation: fadeInOverlay 0.25s ease;
+  }
+
+  .layout-content {
+    width: 100%;
+  }
+
+  .page-content {
+    padding: 20px 16px;
+  }
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

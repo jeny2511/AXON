@@ -1,8 +1,33 @@
 import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import "./pages.css";
 import "./Feedback.css";
 import StudentLayout from "../layouts/StudentLayout";
+import {
+  getActiveStudentId,
+  getStudentProfile,
+  getEventById,
+  getAllEvents,
+  hasSubmittedFeedback,
+  submitStudentFeedback,
+} from "../services/studentService";
 
 function Feedback() {
+  const { eventId: paramEventId } = useParams();
+  const navigate = useNavigate();
+
+  const studentId = getActiveStudentId();
+  const student = getStudentProfile(studentId) || {
+    id: studentId,
+    fullName: "Student",
+  };
+
+  const allEvents = getAllEvents();
+  const defaultEventId = paramEventId || "EV004";
+  const [selectedEventId, setSelectedEventId] = useState(defaultEventId);
+
+  const selectedEvent = getEventById(selectedEventId) || allEvents[0];
+
   const [formData, setFormData] = useState({
     overallRating: "",
     contentRating: "",
@@ -11,8 +36,13 @@ function Feedback() {
     wouldRecommend: false,
   });
 
-  const [submitted, setSubmitted] = useState(false);
+  const [submittedEventIds, setSubmittedEventIds] = useState([]);
   const [error, setError] = useState("");
+
+  const isSubmitted = selectedEvent
+    ? hasSubmittedFeedback(student.id, selectedEvent.id) ||
+      submittedEventIds.includes(selectedEvent.id)
+    : false;
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -23,11 +53,22 @@ function Feedback() {
     }));
 
     setError("");
-    setSubmitted(false);
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const handleEventChange = (e) => {
+    setSelectedEventId(e.target.value);
+    setFormData({
+      overallRating: "",
+      contentRating: "",
+      speakerRating: "",
+      comment: "",
+      wouldRecommend: false,
+    });
+    setError("");
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
 
     if (
       !formData.overallRating ||
@@ -36,155 +77,157 @@ function Feedback() {
       !formData.comment.trim()
     ) {
       setError("Please complete all required fields before submitting.");
-      setSubmitted(false);
       return;
     }
 
-    const feedbackData = {
-      feedbackId: `FB-${Date.now()}`,
-      studentId: "ST002",
-      eventId: "EV004",
-      overallRating: Number(formData.overallRating),
-      contentRating: Number(formData.contentRating),
-      speakerRating: Number(formData.speakerRating),
-      comment: formData.comment.trim(),
-      wouldRecommend: formData.wouldRecommend,
-      submittedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      "axon_feedback_ST002_EV004",
-      JSON.stringify(feedbackData)
-    );
+    submitStudentFeedback(student.id, selectedEvent.id, formData);
 
     setError("");
-    setSubmitted(true);
+    setSubmittedEventIds((prev) => [...prev, selectedEvent.id]);
   };
 
   return (
     <StudentLayout>
-      <div className="student-page">
-        <div className="page-header">
-          <h1>Event Feedback</h1>
-          <p>
-            Share your experience and help us improve future events.
+      <div className="feedback-page">
+        <div className="page-container">
+          <h1 className="page-title">Event Feedback</h1>
+          <p className="page-subtitle">
+            Share your experience to help Volunteers and Admins improve future AXON events.
           </p>
         </div>
 
         <div className="feedback-card">
-          <div className="feedback-event">
-            <h2>Smart India Hackathon Internal Round</h2>
-            <p>Share your experience about this event.</p>
+          {/* Event Selection */}
+          <div className="form-group" style={{ marginBottom: "20px" }}>
+            <label htmlFor="selectEvent" style={{ fontWeight: "600", marginBottom: "8px", display: "block" }}>
+              Select Event for Feedback
+            </label>
+            <select
+              id="selectEvent"
+              value={selectedEventId}
+              onChange={handleEventChange}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+              }}
+            >
+              {allEvents.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({ev.eventDate})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {error && (
-            <div className="feedback-message feedback-error">
-              {error}
-            </div>
-          )}
+          <div className="feedback-event">
+            <h2>{selectedEvent?.name}</h2>
+            <p>{selectedEvent?.description}</p>
+          </div>
 
-          {submitted && (
+          {error && <div className="feedback-message feedback-error">{error}</div>}
+
+          {isSubmitted && (
             <div className="feedback-message feedback-success">
-              Feedback submitted successfully.
+              Feedback has been submitted and recorded for this event. Thank you!
             </div>
           )}
 
-          <form className="feedback-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="overallRating">
-                Overall Rating *
-              </label>
+          {!isSubmitted ? (
+            <form className="feedback-form" onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label htmlFor="overallRating">Overall Event Rating *</label>
+                <select
+                  id="overallRating"
+                  name="overallRating"
+                  value={formData.overallRating}
+                  onChange={handleChange}
+                >
+                  <option value="">Select rating</option>
+                  <option value="5">5 - Excellent</option>
+                  <option value="4">4 - Very Good</option>
+                  <option value="3">3 - Good</option>
+                  <option value="2">2 - Fair</option>
+                  <option value="1">1 - Poor</option>
+                </select>
+              </div>
 
-              <select
-                id="overallRating"
-                name="overallRating"
-                value={formData.overallRating}
-                onChange={handleChange}
+              <div className="form-group">
+                <label htmlFor="contentRating">Content & Learning Quality *</label>
+                <select
+                  id="contentRating"
+                  name="contentRating"
+                  value={formData.contentRating}
+                  onChange={handleChange}
+                >
+                  <option value="">Select rating</option>
+                  <option value="5">5 - Excellent</option>
+                  <option value="4">4 - Very Good</option>
+                  <option value="3">3 - Good</option>
+                  <option value="2">2 - Fair</option>
+                  <option value="1">1 - Poor</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="speakerRating">Speaker / Instructor Rating *</label>
+                <select
+                  id="speakerRating"
+                  name="speakerRating"
+                  value={formData.speakerRating}
+                  onChange={handleChange}
+                >
+                  <option value="">Select rating</option>
+                  <option value="5">5 - Excellent</option>
+                  <option value="4">4 - Very Good</option>
+                  <option value="3">3 - Good</option>
+                  <option value="2">2 - Fair</option>
+                  <option value="1">1 - Poor</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="comment">Your Detailed Feedback & Suggestions *</label>
+                <textarea
+                  id="comment"
+                  name="comment"
+                  rows="4"
+                  value={formData.comment}
+                  onChange={handleChange}
+                  placeholder="Share what went well and what can be improved..."
+                />
+              </div>
+
+              <div className="form-group checkbox-group">
+                <input
+                  type="checkbox"
+                  id="wouldRecommend"
+                  name="wouldRecommend"
+                  checked={formData.wouldRecommend}
+                  onChange={handleChange}
+                />
+                <label htmlFor="wouldRecommend">
+                  I would recommend this event to other students.
+                </label>
+              </div>
+
+              <div className="feedback-actions">
+                <button type="submit">Submit Feedback</button>
+              </div>
+            </form>
+          ) : (
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
+              <button
+                type="button"
+                className="rulebook-button"
+                onClick={() => navigate("/my-events")}
               >
-                <option value="">Select rating</option>
-                <option value="5">5 - Excellent</option>
-                <option value="4">4 - Very Good</option>
-                <option value="3">3 - Good</option>
-                <option value="2">2 - Fair</option>
-                <option value="1">1 - Poor</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="contentRating">
-                Content Rating *
-              </label>
-
-              <select
-                id="contentRating"
-                name="contentRating"
-                value={formData.contentRating}
-                onChange={handleChange}
-              >
-                <option value="">Select rating</option>
-                <option value="5">5 - Excellent</option>
-                <option value="4">4 - Very Good</option>
-                <option value="3">3 - Good</option>
-                <option value="2">2 - Fair</option>
-                <option value="1">1 - Poor</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="speakerRating">
-                Speaker Rating *
-              </label>
-
-              <select
-                id="speakerRating"
-                name="speakerRating"
-                value={formData.speakerRating}
-                onChange={handleChange}
-              >
-                <option value="">Select rating</option>
-                <option value="5">5 - Excellent</option>
-                <option value="4">4 - Very Good</option>
-                <option value="3">3 - Good</option>
-                <option value="2">2 - Fair</option>
-                <option value="1">1 - Poor</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="comment">
-                Your Feedback *
-              </label>
-
-              <textarea
-                id="comment"
-                name="comment"
-                rows="5"
-                value={formData.comment}
-                onChange={handleChange}
-                placeholder="Tell us about your experience..."
-              />
-            </div>
-
-            <div className="form-group checkbox-group">
-              <input
-                type="checkbox"
-                id="wouldRecommend"
-                name="wouldRecommend"
-                checked={formData.wouldRecommend}
-                onChange={handleChange}
-              />
-
-              <label htmlFor="wouldRecommend">
-                I would recommend this event to other students.
-              </label>
-            </div>
-
-            <div className="feedback-actions">
-              <button type="submit">
-                Submit Feedback
+                ← Back to My Events
               </button>
             </div>
-          </form>
+          )}
         </div>
       </div>
     </StudentLayout>
