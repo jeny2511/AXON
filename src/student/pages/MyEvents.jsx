@@ -5,6 +5,7 @@ import StudentLayout from "../layouts/StudentLayout";
 import EventCard from "../components/EventCard/EventCard";
 import EmptyState from "../components/EmptyState/EmptyState";
 import CertificateView from "../components/CertificateView";
+import { registrations } from "../../mockData/registrations";
 
 import {
   getStudentRegistrations,
@@ -125,7 +126,12 @@ function MyEvents() {
 
         {myEvents.length > 0 ? (
           <div className="my-events-grid">
-            {myEvents.map((event) => (
+            {myEvents.map((event) => {
+  const registration = registrations.find(
+    (item) => item.eventId === event.id
+  );
+
+  return (
               <div className="my-event-wrapper" key={event.id}>
                 <EventCard
                   title={event.name}
@@ -137,6 +143,21 @@ function MyEvents() {
                   status={event.status}
                   buttonText="View Event"
                 />
+                <div className="my-event-status">
+  <span>Attendance:</span>
+
+  <strong
+    className={
+      registration?.attendanceStatus === "present"
+        ? "attendance-present"
+        : "attendance-pending"
+    }
+  >
+    {registration?.attendanceStatus === "present"
+      ? "Present"
+      : "Pending"}
+  </strong>
+</div>
 
                 <div className="my-event-extra-actions">
                   <button
@@ -156,7 +177,8 @@ function MyEvents() {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+})}
           </div>
         ) : (
           <EmptyState
