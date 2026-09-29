@@ -1,10 +1,14 @@
 // Student Shared Service
-
+import { attendance } from "../../mockData/attendance";
 import { events } from "../../mockData/events";
 import { registrations } from "../../mockData/registrations";
 import { certificates } from "../../mockData/certificates";
 import { feedback } from "../../mockData/feedback";
 import { gallery } from "../../mockData/gallery";
+import { aboutTCF } from "../../mockData/about";
+import { notifications } from "../../mockData/notifications";
+import { learning } from "../../mockData/learning";
+
 
 // --------------------------------------------
 // EVENTS
@@ -30,7 +34,7 @@ export function getOngoingEvents() {
 
 // Get completed events
 export function getCompletedEvents() {
-  return events.filter(event => event.status === "Completed");
+  return events.filter(event => event.status === "completed");
 }
 
 // Get one event by ID
@@ -95,6 +99,26 @@ export function hasSubmittedFeedback(studentId, eventId) {
 }
 
 // --------------------------------------------
+// ATTENDANCE
+// --------------------------------------------
+
+// Get attendance records of one student
+export function getStudentAttendance(studentId) {
+  return attendance.filter(
+    item => item.studentId === studentId
+  );
+}
+
+// Get events attended by one student
+export function getStudentCompletedEvents(studentId) {
+  const studentAttendance = getStudentAttendance(studentId);
+
+  return studentAttendance.filter(
+    item => item.status === "present"
+  );
+}
+
+// --------------------------------------------
 // DASHBOARD
 // --------------------------------------------
 
@@ -106,13 +130,17 @@ export function getNearestUpcomingEvent() {
     return null;
   }
 
-  return upcomingEvents[0];
+  return upcomingEvents.reduce((nearest, event) => {
+    return new Date(event.eventDate) < new Date(nearest.eventDate)
+      ? event
+      : nearest;
+  });
 }
 
 // Dashboard statistics
 export function getDashboardStats(studentId) {
   const registeredEvents = getStudentRegistrations(studentId);
-  const completedEvents = getCompletedEvents();
+  const completedEvents = getStudentCompletedEvents(studentId);
   const studentCertificates = getStudentCertificates(studentId);
 
   return {
@@ -122,3 +150,47 @@ export function getDashboardStats(studentId) {
     certificates: studentCertificates.length,
   };
 }
+
+// --------------------------------------------
+// ABOUT TCF
+// --------------------------------------------
+
+// Get TCF information
+export function getAboutTCF() {
+  return aboutTCF;
+}
+
+// --------------------------------------------
+// LEARNING HUB
+// --------------------------------------------
+
+// Get all learning resources
+export function getLearningResources() {
+  return learning;
+}
+
+// Get featured learning resources
+export function getFeaturedLearningResources() {
+  return learning.filter(
+    resource => resource.isFeatured === true
+  );
+}
+
+// Get learning resources by category
+export function getLearningResourcesByCategory(category) {
+  return learning.filter(
+    resource => resource.category === category
+  );
+}
+
+// --------------------------------------------
+// NOTIFICATIONS
+// --------------------------------------------
+
+// Get notifications of one student
+export function getStudentNotifications(studentId) {
+  return notifications.filter(
+    notification => notification.userId === studentId
+  );
+}
+
