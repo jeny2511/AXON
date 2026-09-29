@@ -48,10 +48,15 @@ function EventDetails() {
     );
   }
 
-  const alreadyRegistered = isStudentRegistered(student.id, event.id);
-  const eligibility = checkRegistrationEligibility(event, student);
+  const alreadyRegistered = student?.id ? isStudentRegistered(student.id, event.id) : false;
+  const eligibility = student ? checkRegistrationEligibility(event, student) : { eligible: false, reason: "Login required." };
 
   const handleRegister = () => {
+    if (!studentId) {
+      navigate(`/login?redirect=${encodeURIComponent(`/events/${event.id}`)}`);
+      return;
+    }
+
     if (!eligibility.eligible) {
       setStatusMessage(eligibility.reason);
       return;

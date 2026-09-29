@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./StudentNavbar.css";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -6,16 +6,23 @@ import {
   getStudentProfile,
   getStudentNotifications,
 } from "../services/studentService";
+import { isLoggedIn } from "../services/authService";
 
 function StudentNavbar({ onToggleSidebar }) {
   const navigate = useNavigate();
+  const [authenticated, setAuthenticated] = useState(() => isLoggedIn());
   const studentId = getActiveStudentId();
-  const student = getStudentProfile(studentId) || {
-    fullName: "Jeny Thesiya",
-    department: "IT",
-  };
+  const student = authenticated ? getStudentProfile(studentId) : null;
 
-  const notifications = getStudentNotifications(studentId);
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setAuthenticated(isLoggedIn());
+    };
+    window.addEventListener("axon-auth-change", handleAuthChange);
+    return () => window.removeEventListener("axon-auth-change", handleAuthChange);
+  }, []);
+
+  const notifications = studentId ? getStudentNotifications(studentId) : [];
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,38 +61,40 @@ function StudentNavbar({ onToggleSidebar }) {
       </div>
 
       <div className="navbar-right">
-        <Link
-          to="/notifications"
-          className="notification-btn"
-          title="Notifications"
-          style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
-        >
-          <span>🔔</span>
-          {unreadCount > 0 && (
-            <span
-              style={{
-                position: "absolute",
-                top: "-4px",
-                right: "-4px",
-                background: "#dc2626",
-                color: "#ffffff",
-                fontSize: "10px",
-                fontWeight: "700",
-                borderRadius: "50%",
-                width: "18px",
-                height: "18px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {unreadCount}
-            </span>
-          )}
-        </Link>
+        {authenticated ? (
+          <Link
+            to="/notifications"
+            className="notification-btn"
+            title="Notifications"
+            style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
+          >
+            <span>🔔</span>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-4px",
+                  right: "-4px",
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: "700",
+                  borderRadius: "50%",
+                  width: "18px",
+                  height: "18px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {unreadCount}
+              </span>
+            )}
+          </Link>
+        ) : null}
 
         <Link
-          to="/profile"
+          to={authenticated ? "/profile" : "/login"}
           className="student-info"
           style={{ textDecoration: "none" }}
         >
@@ -104,12 +113,18 @@ function StudentNavbar({ onToggleSidebar }) {
               flexShrink: 0,
             }}
           >
-            {student.fullName ? student.fullName.charAt(0) : "S"}
+            {authenticated && student?.fullName
+              ? student.fullName.charAt(0)
+              : "G"}
           </div>
 
           <div>
-            <h4>{student.fullName}</h4>
-            <p>{student.department} Department</p>
+            <h4>{authenticated && student ? student.fullName : "Guest User"}</h4>
+            <p>
+              {authenticated && student
+                ? `${student.department} Department`
+                : "Sign In"}
+            </p>
           </div>
         </Link>
       </div>

@@ -1,17 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StudentLayout from "../layouts/StudentLayout";
 import {
   getActiveStudentId,
   getStudentProfile,
   updateStudentProfile,
 } from "../services/studentService";
+import {
+  isLoggedIn,
+  loginStudent,
+  signupStudent,
+} from "../services/authService";
+import { users as mockUsers } from "../../mockData/users";
 import "./Profile.css";
+import "./Login.css";
 
 function Profile() {
-  const [studentId] = useState(() => getActiveStudentId());
+  const [authenticated, setAuthenticated] = useState(() => isLoggedIn());
+  const [studentId, setStudentId] = useState(() => getActiveStudentId());
   const [student, setStudent] = useState(() => getStudentProfile(studentId));
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState(null); // { type: "success" | "error", text: string }
+
+  // Guest auth tabs
+  const [authTab, setAuthTab] = useState("login"); // "login" | "signup"
+  const [loginInput, setLoginInput] = useState("");
+  const [signupForm, setSignupForm] = useState({
+    fullName: "",
+    email: "",
+    department: "IT",
+    year: 3,
+    semester: 5,
+    enrollmentNo: "",
+    phone: "",
+  });
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
 
@@ -26,6 +47,29 @@ function Profile() {
     email: student?.email || "",
     phone: student?.phone || "",
   }));
+
+  const studentsList = mockUsers.filter((u) => u.role === "student");
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const isAuth = isLoggedIn();
+      const currentId = getActiveStudentId();
+      setAuthenticated(isAuth);
+      setStudentId(currentId);
+      const profile = getStudentProfile(currentId);
+      setStudent(profile);
+      if (profile) {
+        setFormData({
+          fullName: profile.fullName || "",
+          email: profile.email || "",
+          phone: profile.phone || "",
+        });
+      }
+    };
+
+    window.addEventListener("axon-auth-change", handleAuthChange);
+    return () => window.removeEventListener("axon-auth-change", handleAuthChange);
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -104,11 +148,57 @@ function Profile() {
     setShowPasswordForm(false);
   };
 
+  const handleGuestLoginSubmit = (e) => {
+    e.preventDefault();
+    if (!loginInput.trim()) {
+      setMessage({ type: "error", text: "Please enter your Student ID or Email." });
+      return;
+    }
+
+    try {
+      loginStudent(loginInput);
+      setMessage({ type: "success", text: "Logged in successfully!" });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to log in." });
+    }
+  };
+
+  const handleGuestQuickLogin = (id) => {
+    try {
+      loginStudent(id);
+      setMessage({ type: "success", text: "Logged in successfully!" });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to log in." });
+    }
+  };
+
+  const handleGuestSignupSubmit = (e) => {
+    e.preventDefault();
+    if (!signupForm.fullName.trim() || !signupForm.email.trim()) {
+      setMessage({ type: "error", text: "Full name and email are required." });
+      return;
+    }
+
+    try {
+      signupStudent(signupForm);
+      setMessage({ type: "success", text: "Account created and logged in successfully!" });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to sign up." });
+    }
+  };
+
   return (
     <StudentLayout>
       <div className="profile-page">
         <h1 className="page-title">My Profile</h1>
-        <p className="page-subtitle">View and manage your student academic information.</p>
+        <p className="page-subtitle">
+          {authenticated
+            ? "View and manage your student academic information."
+            : "Sign in with your student account to view and manage your profile."}
+        </p>
 
         {message && (
           <div
@@ -127,7 +217,143 @@ function Profile() {
           </div>
         )}
 
-        {student && (
+        {!authenticated ? (
+          /* Guest Mode Profile View: Login & Signup options */
+          <div className="auth-card" style={{ maxWidth: "560px", margin: "0 auto" }}>
+            <div className="auth-header">
+              <h2>Student Authentication</h2>
+              <p>You are currently browsing as a Guest. Log in or register below:</p>
+            </div>
+
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab-btn ${authTab === "login" ? "active" : ""}`}
+                onClick={() => setAuthTab("login")}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-tab-btn ${authTab === "signup" ? "active" : ""}`}
+                onClick={() => setAuthTab("signup")}
+              >
+                Register Account
+              </button>
+            </div>
+
+            {authTab === "login" ? (
+              <form className="auth-form" onSubmit={handleGuestLoginSubmit}>
+                <div className="form-field">
+                  <label htmlFor="loginInput">Student ID or Email</label>
+                  <input
+                    id="loginInput"
+                    type="text"
+                    placeholder="e.g. ST001 or jeny@vgec.ac.in"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="loginPass">Password</label>
+                  <input
+                    id="loginPass"
+                    type="password"
+                    placeholder="Enter password"
+                    defaultValue="••••••••"
+                  />
+                </div>
+
+                <button type="submit" className="auth-submit-btn">
+                  Log In to Student Portal
+                </button>
+
+                <div className="quick-login-section">
+                  <p>Quick Demo Student Accounts:</p>
+                  <div className="quick-chips">
+                    {studentsList.map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        className="quick-chip"
+                        onClick={() => handleGuestQuickLogin(st.id)}
+                      >
+                        {st.fullName} ({st.id})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <form className="auth-form" onSubmit={handleGuestSignupSubmit}>
+                <div className="form-field">
+                  <label htmlFor="guestFullName">Full Name *</label>
+                  <input
+                    id="guestFullName"
+                    type="text"
+                    placeholder="e.g. Rahul Sharma"
+                    value={signupForm.fullName}
+                    onChange={(e) =>
+                      setSignupForm({ ...signupForm, fullName: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="guestEmail">College Email *</label>
+                  <input
+                    id="guestEmail"
+                    type="email"
+                    placeholder="e.g. rahul@vgec.ac.in"
+                    value={signupForm.email}
+                    onChange={(e) =>
+                      setSignupForm({ ...signupForm, email: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div className="form-field">
+                    <label htmlFor="guestDept">Department</label>
+                    <select
+                      id="guestDept"
+                      value={signupForm.department}
+                      onChange={(e) =>
+                        setSignupForm({ ...signupForm, department: e.target.value })
+                      }
+                    >
+                      <option value="IT">IT</option>
+                      <option value="CE">CE</option>
+                      <option value="EC">EC</option>
+                      <option value="ICT">ICT</option>
+                    </select>
+                  </div>
+
+                  <div className="form-field">
+                    <label htmlFor="guestYear">Year</label>
+                    <select
+                      id="guestYear"
+                      value={signupForm.year}
+                      onChange={(e) =>
+                        setSignupForm({ ...signupForm, year: Number(e.target.value) })
+                      }
+                    >
+                      <option value={1}>1st Year</option>
+                      <option value={2}>2nd Year</option>
+                      <option value={3}>3rd Year</option>
+                      <option value={4}>4th Year</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button type="submit" className="auth-submit-btn">
+                  Complete Registration & Sign In
+                </button>
+              </form>
+            )}
+          </div>
+        ) : student ? (
           <div className="profile-card">
             <div className="profile-header">
               <div className="profile-image">
@@ -302,7 +528,7 @@ function Profile() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </StudentLayout>
   );

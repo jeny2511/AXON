@@ -10,13 +10,17 @@ import { notifications as mockNotifications } from "../../mockData/notifications
 import { learning as mockLearning } from "../../mockData/learning";
 import { users as mockUsers } from "../../mockData/users";
 
-// Default active student (can be stored in localStorage for demo)
+// Active student session helper (returns null for Guest Mode)
 export function getActiveStudentId() {
-  return localStorage.getItem("axon_active_student_id") || "ST001";
+  return localStorage.getItem("axon_auth_student_id") || null;
 }
 
 export function setActiveStudentId(studentId) {
-  localStorage.setItem("axon_active_student_id", studentId);
+  if (studentId) {
+    localStorage.setItem("axon_auth_student_id", studentId);
+  } else {
+    localStorage.removeItem("axon_auth_student_id");
+  }
 }
 
 // --------------------------------------------
