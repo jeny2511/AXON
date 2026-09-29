@@ -1,7 +1,6 @@
 import StudentLayout from "../layouts/StudentLayout";
 import NotificationCard from "../components/NotificationCard/NotificationCard";
 import { getStudentNotifications } from "../services/studentService";
-import "./Notifications.css";
 
 function Notifications() {
   const studentId = "ST001";
