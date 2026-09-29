@@ -213,3 +213,21 @@
     padding: 22px;
   }
 }
+
+.my-event-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.attendance-present {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.attendance-pending {
+  color: #d97706;
+  font-weight: 700;
+}
