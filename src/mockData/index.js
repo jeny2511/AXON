@@ -14,3 +14,6 @@ export { certificates } from "./certificates";
 export { notifications } from "./notifications";
 export { gallery } from "./gallery";
 export { learning } from "./learning";
+// About TCF
+
+export { aboutTCF } from "./about";
