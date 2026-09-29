@@ -5,23 +5,20 @@ export const gallery = [
     eventName: "Smart India Hackathon Internal Round",
     eventDate: "2027-08-18",
     venue: "Innovation Lab",
-
     description:
       "Highlights from the internal Smart India Hackathon round organized by TCF VGEC.",
-
     coverImage: "/assets/images/gallery/sih/cover.jpg",
-
+    banner: "/assets/images/gallery/sih/cover.jpg",
+    tags: ["Hackathon", "Innovation", "Prototype"],
     photos: [
       "/assets/images/gallery/sih/photo1.jpg",
       "/assets/images/gallery/sih/photo2.jpg",
       "/assets/images/gallery/sih/photo3.jpg",
       "/assets/images/gallery/sih/photo4.jpg"
     ],
-
     videos: [
       "/assets/videos/sih/highlight.mp4"
     ],
-
     totalPhotos: 4
   },
 
@@ -31,20 +28,17 @@ export const gallery = [
     eventName: "Phishing Awareness Session",
     eventDate: "2027-08-05",
     venue: "VGEC Auditorium",
-
     description:
       "Cybersecurity awareness session focused on phishing attacks and email safety.",
-
     coverImage: "/assets/images/gallery/phishing/cover.jpg",
-
+    banner: "/assets/images/gallery/phishing/cover.jpg",
+    tags: ["Awareness", "Phishing", "Email Security"],
     photos: [
       "/assets/images/gallery/phishing/photo1.jpg",
       "/assets/images/gallery/phishing/photo2.jpg",
       "/assets/images/gallery/phishing/photo3.jpg"
     ],
-
     videos: [],
-
     totalPhotos: 3
   },
 
@@ -54,12 +48,11 @@ export const gallery = [
     eventName: "Cyber Quest 2026",
     eventDate: "2026-03-14",
     venue: "VGEC Campus",
-
     description:
       "One-day cybersecurity challenge with CTF rounds, quizzes, and networking activities.",
-
     coverImage: "/assets/images/gallery/cyberquest/cover.jpg",
-
+    banner: "/assets/images/gallery/cyberquest/cover.jpg",
+    tags: ["Competition", "CTF", "Quiz"],
     photos: [
       "/assets/images/gallery/cyberquest/photo1.jpg",
       "/assets/images/gallery/cyberquest/photo2.jpg",
@@ -67,11 +60,9 @@ export const gallery = [
       "/assets/images/gallery/cyberquest/photo4.jpg",
       "/assets/images/gallery/cyberquest/photo5.jpg"
     ],
-
     videos: [
       "/assets/videos/cyberquest/event.mp4"
     ],
-
     totalPhotos: 5
   },
 
@@ -81,21 +72,18 @@ export const gallery = [
     eventName: "Ethical Hacking Bootcamp",
     eventDate: "2026-01-28",
     venue: "Cyber Security Lab",
-
     description:
       "Hands-on bootcamp covering Linux, networking, Wireshark, and basic penetration testing.",
-
     coverImage: "/assets/images/gallery/bootcamp/cover.jpg",
-
+    banner: "/assets/images/gallery/bootcamp/cover.jpg",
+    tags: ["Workshop", "Linux", "Ethical Hacking"],
     photos: [
       "/assets/images/gallery/bootcamp/photo1.jpg",
       "/assets/images/gallery/bootcamp/photo2.jpg",
       "/assets/images/gallery/bootcamp/photo3.jpg",
       "/assets/images/gallery/bootcamp/photo4.jpg"
     ],
-
     videos: [],
-
     totalPhotos: 4
   },
 
@@ -105,12 +93,11 @@ export const gallery = [
     eventName: "Cyber Fiesta 2025",
     eventDate: "2025-11-22",
     venue: "Seminar Hall",
-
     description:
       "Annual TCF event featuring expert talks, workshops, fun competitions, and networking.",
-
     coverImage: "/assets/images/gallery/cyberfiesta/cover.jpg",
-
+    banner: "/assets/images/gallery/cyberfiesta/cover.jpg",
+    tags: ["Annual Fest", "Workshops", "Networking"],
     photos: [
       "/assets/images/gallery/cyberfiesta/photo1.jpg",
       "/assets/images/gallery/cyberfiesta/photo2.jpg",
@@ -119,11 +106,9 @@ export const gallery = [
       "/assets/images/gallery/cyberfiesta/photo5.jpg",
       "/assets/images/gallery/cyberfiesta/photo6.jpg"
     ],
-
     videos: [
       "/assets/videos/cyberfiesta/highlight.mp4"
     ],
-
     totalPhotos: 6
   }
 ];

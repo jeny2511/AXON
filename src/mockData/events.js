@@ -140,7 +140,7 @@ export const events = [
     rulebook: "/rulebooks/sih.pdf",
 
     certificateAvailable: true,
-    feedbackRequired: false
+    feedbackRequired: true
   },
 
   {

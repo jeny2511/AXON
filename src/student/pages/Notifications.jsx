@@ -2,75 +2,81 @@ import { useState } from "react";
 import "./Notifications.css";
 import StudentLayout from "../layouts/StudentLayout";
 import NotificationCard from "../components/NotificationCard/NotificationCard";
-import { getStudentNotifications } from "../services/studentService";
+import EmptyState from "../components/EmptyState/EmptyState";
+import {
+  getActiveStudentId,
+  getStudentNotifications,
+} from "../services/studentService";
 
 function Notifications() {
-  const studentId = "ST001";
-  const notifications = getStudentNotifications(studentId);
+  const studentId = getActiveStudentId();
+  const [notificationList, setNotificationList] = useState(() =>
+    getStudentNotifications(studentId)
+  );
 
-  const [notificationList, setNotificationList] = useState(notifications);
-
-const handleMarkAsRead = (notificationId) => {
-  setNotificationList((currentNotifications) => {
-    const updatedNotifications = currentNotifications.map(
-      (notification) =>
+  const handleMarkAsRead = (notificationId) => {
+    setNotificationList((currentNotifications) =>
+      currentNotifications.map((notification) =>
         notification.notificationId === notificationId
           ? { ...notification, isRead: true }
           : notification
+      )
     );
+  };
 
-    return updatedNotifications;
-  });
-};
+  const handleMarkAllAsRead = () => {
+    setNotificationList((currentNotifications) =>
+      currentNotifications.map((notification) => ({
+        ...notification,
+        isRead: true,
+      }))
+    );
+  };
 
-const handleMarkAllAsRead = () => {
-  setNotificationList((currentNotifications) =>
-    currentNotifications.map((notification) => ({
-      ...notification,
-      isRead: true,
-    }))
-  );
-};
+  const unreadCount = notificationList.filter((n) => !n.isRead).length;
 
   return (
     <StudentLayout>
-
       <div className="notifications-page">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
+          <div>
+            <h1 className="page-title" style={{ margin: 0 }}>Notifications</h1>
+            <p className="page-subtitle" style={{ margin: "4px 0 0" }}>
+              Stay updated with your event activities, announcements, and certifications.
+            </p>
+          </div>
 
-        <h1 className="page-title">Notifications</h1>
-
-        <p className="page-subtitle">
-          Stay updated with your event activities and important announcements.
-        </p>
-
-        <div className="notification-actions">
-  <button onClick={handleMarkAllAsRead}>
-    Mark all as read
-  </button>
-</div>
-
+          {unreadCount > 0 && (
+            <div className="notification-actions">
+              <button onClick={handleMarkAllAsRead} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", fontWeight: "500", fontSize: "13px" }}>
+                Mark all as read ({unreadCount})
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="notifications-list">
-
           {notificationList.length > 0 ? (
-  notificationList.map((notification) => (
+            notificationList.map((notification) => (
               <NotificationCard
                 key={notification.notificationId}
                 title={notification.title}
                 message={notification.message}
                 type={notification.type}
                 isRead={notification.isRead}
-                onClick={() => handleMarkAsRead(notification.notificationId)}
+                onClick={() =>
+                  handleMarkAsRead(notification.notificationId)
+                }
               />
             ))
           ) : (
-            <p>No notifications available.</p>
+            <EmptyState
+              title="No Notifications"
+              message="You have no notifications at this time."
+            />
           )}
-
         </div>
-
       </div>
-
     </StudentLayout>
   );
 }

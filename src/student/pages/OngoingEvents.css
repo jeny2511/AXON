@@ -1,0 +1,87 @@
+.ongoing-events-section {
+  width: 100%;
+}
+
+.events-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 700px) {
+  .events-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+.event-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.event-modal {
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  width: 35px;
+  height: 35px;
+  border: none;
+  border-radius: 50%;
+  background: #f1f5f9;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.modal-event-poster {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.modal-description {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.modal-event-details {
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 10px;
+  margin: 20px 0;
+}
+
+.modal-event-details p {
+  margin: 8px 0;
+}
+.event-modal {
+  color: #1e293b;
+}
+
+.event-modal h2 {
+  color: #1e293b;
+}
+
+.event-modal p {
+  color: #475569;
+}

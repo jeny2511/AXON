@@ -24,7 +24,7 @@ export const aboutTCF = {
       image: ""
     },
     {
-      name: "",
+      name: "Meet Parmar",
       role: "Vice President",
       image: ""
     },
