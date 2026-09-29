@@ -5,7 +5,6 @@ import StudentLayout from "../layouts/StudentLayout";
 import EventCard from "../components/EventCard/EventCard";
 import EmptyState from "../components/EmptyState/EmptyState";
 import CertificateView from "../components/CertificateView";
-import { registrations } from "../../mockData/registrations";
 
 import {
   getStudentRegistrations,
@@ -14,12 +13,37 @@ import {
 
 function MyEvents() {
   const studentId = "ST002";
+ const serviceRegistrations = getStudentRegistrations(studentId);
 
-  const registrations = getStudentRegistrations(studentId);
+const localRegistrations = JSON.parse(
+  localStorage.getItem(`axon_registrations_${studentId}`) || "[]"
+);
 
-  const myEvents = registrations
-    .map((registration) => getEventById(registration.eventId))
-    .filter(Boolean);
+// Local registration is the latest version.
+// If the same event exists in both sources,
+// use the localStorage version.
+const registrationMap = new Map();
+
+serviceRegistrations.forEach((registration) => {
+  registrationMap.set(registration.eventId, registration);
+});
+
+localRegistrations.forEach((registration) => {
+  registrationMap.set(registration.eventId, registration);
+});
+
+const allRegistrations = Array.from(registrationMap.values());
+
+const attendedRegistrations = allRegistrations.filter(
+  (registration) =>
+    registration.attendanceStatus === "present"
+);
+
+const myEvents = attendedRegistrations
+  .map((registration) =>
+    getEventById(registration.eventId)
+  )
+  .filter(Boolean);
 
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [selectedFeedbackEvent, setSelectedFeedbackEvent] = useState(null);
@@ -127,8 +151,8 @@ function MyEvents() {
         {myEvents.length > 0 ? (
           <div className="my-events-grid">
             {myEvents.map((event) => {
-  const registration = registrations.find(
-    (item) => item.eventId === event.id
+const registration = allRegistrations.find(
+      (item) => item.eventId === event.id
   );
 
   return (
