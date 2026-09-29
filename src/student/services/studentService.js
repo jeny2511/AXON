@@ -93,3 +93,32 @@ export function hasSubmittedFeedback(studentId, eventId) {
       item.eventId === eventId
   );
 }
+
+// --------------------------------------------
+// DASHBOARD
+// --------------------------------------------
+
+// Get nearest upcoming event
+export function getNearestUpcomingEvent() {
+  const upcomingEvents = getUpcomingEvents();
+
+  if (upcomingEvents.length === 0) {
+    return null;
+  }
+
+  return upcomingEvents[0];
+}
+
+// Dashboard statistics
+export function getDashboardStats(studentId) {
+  const registeredEvents = getStudentRegistrations(studentId);
+  const completedEvents = getCompletedEvents();
+  const studentCertificates = getStudentCertificates(studentId);
+
+  return {
+    upcomingEvents: getUpcomingEvents().length,
+    registeredEvents: registeredEvents.length,
+    completedEvents: completedEvents.length,
+    certificates: studentCertificates.length,
+  };
+}

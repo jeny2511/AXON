@@ -31,10 +31,10 @@ function EventCard({
         <p className="event-description">{description}</p>
 
         <div className="event-details">
-          <p>📅 {date}</p>
-          <p>🕘 {time}</p>
-          <p>📍 {venue}</p>
-        </div>
+  <p>{date}</p>
+  <p>{time}</p>
+  <p>{venue}</p>
+</div>
 
         <button className="event-button" onClick={onClick}>
           {buttonText}

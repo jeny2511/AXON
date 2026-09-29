@@ -6,13 +6,30 @@
 .search-container input {
   width: 100%;
   height: 46px;
-  border: 1px solid #D1D5DB;
-  border-radius: 12px;
+  box-sizing: border-box;
+
   padding: 0 18px;
+
+  border: 1px solid #e8e7ee;
+  border-radius: 12px;
+
+  background: #ffffff;
+  color: #1f1f29;
+
   font-size: 14px;
+
   outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.search-container input::placeholder {
+  color: #9a98a6;
 }
 
 .search-container input:focus {
-  border-color: #6D28D9;
+  border-color: #6a3bc5;
+  box-shadow: 0 0 0 3px rgba(106, 59, 197, 0.08);
 }
