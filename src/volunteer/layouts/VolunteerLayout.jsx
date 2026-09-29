@@ -8,20 +8,20 @@ function VolunteerLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] text-gray-800 antialiased">
+    <div className="min-h-screen bg-[#f7f7f9]">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
 
-      {/* Main content area */}
-      <div className="flex min-h-screen flex-col lg:ml-[240px]">
+      {/* Main area */}
+      <div className="min-h-screen lg:ml-[230px]">
         <Topbar
           onMenuClick={() => setSidebarOpen(true)}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="min-h-[calc(100vh-68px)] p-4 sm:p-5 lg:p-6">
           <Outlet />
         </main>
       </div>

@@ -1,16 +1,17 @@
 import { NavLink } from "react-router-dom";
+
 import {
   LayoutDashboard,
   CalendarDays,
-  Users,
-  UserCheck,
-  ClipboardCheck,
-  BarChart2,
+  ClipboardList,
   MessageSquare,
   Images,
-  CheckSquare,
   FileText,
-  UserPlus,
+  Award,
+  ListChecks,
+  UserCheck,
+  BookOpen,
+  Bell,
   User,
   LogOut,
   X,
@@ -23,44 +24,24 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
-    name: "Events",
+    name: "Manage Events",
     path: "/volunteer/events",
     icon: CalendarDays,
   },
   {
-    name: "Volunteers",
-    path: "/volunteer/volunteers",
-    icon: Users,
-  },
-  {
-    name: "Participants",
+    name: "Registrations",
     path: "/volunteer/registrations",
-    icon: UserCheck,
+    icon: ClipboardList,
   },
   {
-    name: "Attendance",
-    path: "/volunteer/presence",
-    icon: ClipboardCheck,
-  },
-  {
-    name: "Analysis",
-    path: "/volunteer/analysis",
-    icon: BarChart2,
-  },
-  {
-    name: "Feedback",
+    name: "Feedback Form",
     path: "/volunteer/feedback",
     icon: MessageSquare,
   },
   {
-    name: "Gallery",
+    name: "Event Gallery",
     path: "/volunteer/gallery",
     icon: Images,
-  },
-  {
-    name: "Task Progress",
-    path: "/volunteer/tasks",
-    icon: CheckSquare,
   },
   {
     name: "Reports",
@@ -68,9 +49,29 @@ const menuItems = [
     icon: FileText,
   },
   {
-    name: "Add Volunteer",
-    path: "/volunteer/add-volunteer",
-    icon: UserPlus,
+    name: "Certificates",
+    path: "/volunteer/certificates",
+    icon: Award,
+  },
+  {
+    name: "Tasks",
+    path: "/volunteer/tasks",
+    icon: ListChecks,
+  },
+  {
+    name: "My Presence",
+    path: "/volunteer/presence",
+    icon: UserCheck,
+  },
+  {
+    name: "Learning Hub",
+    path: "/volunteer/learning",
+    icon: BookOpen,
+  },
+  {
+    name: "Notifications",
+    path: "/volunteer/notifications",
+    icon: Bell,
   },
 ];
 
@@ -80,70 +81,72 @@ function Sidebar({ isOpen, onClose }) {
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
         className={`
-          fixed left-0 top-0 z-50 flex h-screen w-[240px]
-          flex-col bg-[#19143c] text-white
-          transition-transform duration-300 ease-in-out
+          fixed left-0 top-0 z-50 flex h-screen w-[230px]
+          flex-col bg-[#211653] text-white
+          transition-transform duration-300
           lg:translate-x-0
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Logo Header */}
-        <div className="flex h-20 items-center justify-between px-5">
+        {/* Logo */}
+        <div className="flex h-[100px] items-center justify-between px-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#635bff] text-base font-bold text-white shadow-sm">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#7440d5] text-sm font-semibold">
               A
             </div>
 
             <div>
-              <h1 className="text-base font-bold tracking-wide text-white leading-tight">
+              <h1 className="text-[18px] font-semibold leading-none">
                 AXON
               </h1>
-              <p className="text-[11px] text-purple-200/70">
-                Admin Portal
+
+              <p className="mt-1 text-[10px] text-purple-200">
+                Volunteer Portal
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-purple-200 hover:bg-white/10 hover:text-white lg:hidden"
+            className="rounded-md p-1 hover:bg-white/10 lg:hidden"
           >
-            <X size={20} />
+            <X size={19} />
           </button>
         </div>
 
-        {/* User Card */}
-        <div className="mx-3.5 mb-4 rounded-xl bg-[#231b52] p-3">
+        {/* Volunteer profile */}
+        <div className="mx-3 mb-4 rounded-lg bg-[#332568] px-3 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-[#19143c]">
-              A
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm text-purple-700">
+              P
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-white leading-tight">
-                Admin
+              <p className="truncate text-xs font-medium">
+                Preyas Shah
               </p>
-              <p className="text-[10px] text-purple-200/70">
-                Administrator
+
+              <p className="text-[10px] text-purple-200">
+                Volunteer
               </p>
             </div>
           </div>
         </div>
 
-        {/* Navigation Menu */}
-        <div className="flex-1 overflow-y-auto px-3.5 scrollbar-thin">
-          <p className="mb-2 px-2 text-[10px] font-semibold tracking-wider text-purple-300/50 uppercase">
+        {/* Menu */}
+        <div className="px-3">
+          <p className="mb-2 px-3 text-[9px] font-medium tracking-[1.5px] text-purple-300">
             MAIN MENU
           </p>
 
-          <nav className="space-y-1">
+          <nav className="space-y-0.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
 
@@ -154,14 +157,14 @@ function Sidebar({ isOpen, onClose }) {
                   end={item.path === "/volunteer"}
                   onClick={onClose}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+                    `flex items-center gap-3 rounded-md px-3 py-2 text-[12px] transition ${
                       isActive
-                        ? "bg-[#635bff] text-white shadow-sm"
-                        : "text-purple-200/75 hover:bg-white/5 hover:text-white"
+                        ? "bg-[#7040d0] text-white"
+                        : "text-purple-100 hover:bg-[#302263]"
                     }`
                   }
                 >
-                  <Icon size={17} strokeWidth={2} />
+                  <Icon size={17} strokeWidth={1.8} />
                   <span>{item.name}</span>
                 </NavLink>
               );
@@ -169,26 +172,28 @@ function Sidebar({ isOpen, onClose }) {
           </nav>
         </div>
 
-        {/* Bottom Menu */}
-        <div className="border-t border-white/5 p-3.5">
+        {/* Bottom */}
+        <div className="mt-auto px-3 pb-4">
+          <div className="mb-2 border-t border-purple-900" />
+
           <NavLink
             to="/volunteer/profile"
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+              `flex items-center gap-3 rounded-md px-3 py-2 text-[12px] ${
                 isActive
-                  ? "bg-[#635bff] text-white"
-                  : "text-purple-200/75 hover:bg-white/5 hover:text-white"
+                  ? "bg-[#7040d0] text-white"
+                  : "text-purple-100 hover:bg-[#302263]"
               }`
             }
           >
-            <User size={17} strokeWidth={2} />
-            <span>Profile</span>
+            <User size={17} strokeWidth={1.8} />
+            Profile
           </NavLink>
 
-          <button className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-medium text-purple-200/75 transition-colors hover:bg-white/5 hover:text-white">
-            <LogOut size={17} strokeWidth={2} />
-            <span>Logout</span>
+          <button className="mt-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2 text-[12px] text-purple-100 hover:bg-[#302263]">
+            <LogOut size={17} strokeWidth={1.8} />
+            Logout
           </button>
         </div>
       </aside>
