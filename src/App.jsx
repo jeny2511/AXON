@@ -1,17 +1,11 @@
-import "./index.css";
+import { BrowserRouter } from "react-router-dom";
+import StudentRoutes from "./student/routes/StudentRoutes";
 
 function App() {
   return (
-    <div className="app-foundation">
-      <h1>AXON</h1>
-      <p>TCF Centralized Event Management Platform</p>
-
-      <div className="modules">
-        <div className="module-card student">Student Module</div>
-        <div className="module-card volunteer">Volunteer Module</div>
-        <div className="module-card admin">Admin Module</div>
-      </div>
-    </div>
+    <BrowserRouter>
+      <StudentRoutes />
+    </BrowserRouter>
   );
 }
 

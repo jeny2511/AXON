@@ -1,0 +1,16 @@
+.page-header {
+  margin-bottom: 30px;
+}
+
+.page-header h1 {
+  color: #1F2937;
+  font-size: 34px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.page-header p {
+  color: #6B7280;
+  margin-top: 8px;
+  font-size: 15px;
+}
