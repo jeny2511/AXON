@@ -6,6 +6,7 @@ import LearningHub from "../pages/LearningHub";
 import Reports from "../pages/Reports";
 import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
+import ManageEvents from "../pages/ManageEvents";
 
 function AppRoutes() {
   return (
@@ -27,7 +28,7 @@ function AppRoutes() {
         <Route index element={null} />
 
         {/* Main Menu */}
-        <Route path="events" element={null} />
+        <Route path="events" element={<ManageEvents />} />
         <Route path="registrations" element={null} />
         <Route path="feedback" element={<FeedbackForm />} />
         <Route path="gallery" element={<EventGallery />} />
