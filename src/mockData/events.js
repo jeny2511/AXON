@@ -286,8 +286,6 @@ export const events = [
     certificateAvailable: false,
     feedbackRequired: true
   },
-  // Test events for dynamic status checking
-  // Current date: 2026-09-29
 
   {
     id: "EV009",
