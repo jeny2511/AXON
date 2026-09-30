@@ -282,24 +282,54 @@ function FeedbackForm() {
     setToast("Feedback form published successfully.");
   }
 
+  function unpublishForm() {
+    setForms((items) =>
+      items.map((item) =>
+        item.eventId === selectedEvent.id
+          ? {
+              ...item,
+              publishedAt: null,
+            }
+          : item
+      )
+    );
+    setToast("Feedback form unpublished and returned to draft.");
+  }
+
   function exportCSV() {
     if (!form?.responses?.length) {
       setToast("No responses to export.");
       return;
     }
-    const headers = ["Name", "Enrollment", "Branch", "Year/Sem"];
-    const rows = form.responses.map((r) => [r.name, r.enrollment, r.branch, r.yearSem]);
+    const questionHeaders = (form.questions || []).map((q, idx) => `Q${idx + 1}: ${q.question.replace(/"/g, '""')}`);
+    const headers = ["Name", "Enrollment", "Branch", "Year/Sem", ...questionHeaders];
+    
+    const rows = form.responses.map((r) => {
+      const questionAnswers = (form.questions || []).map((q) => {
+        const ans = r.answers?.[q.id];
+        const text = Array.isArray(ans) ? ans.join("; ") : (ans || "N/A");
+        return `"${text.replace(/"/g, '""')}"`;
+      });
+      return [
+        `"${(r.name || "").replace(/"/g, '""')}"`,
+        `"${r.enrollment || ""}"`,
+        `"${r.branch || ""}"`,
+        `"${r.yearSem || ""}"`,
+        ...questionAnswers,
+      ];
+    });
+
     const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+      "data:text/csv;charset=utf-8,\uFEFF" +
+      [headers.map((h) => `"${h}"`).join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${selectedEvent.name}_feedback_responses.csv`);
+    link.setAttribute("download", `${(selectedEvent.name || "Event").replace(/\s+/g, "_")}_Feedback_Responses.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
-    setToast("Responses exported as CSV.");
+    setToast("Response spreadsheet exported successfully.");
   }
 
   function uploadReport(file) {
@@ -335,8 +365,8 @@ function FeedbackForm() {
     return <div className="p-6 text-sm text-gray-500">Loading feedback...</div>;
   }
 
-  // Extract first 2 choice questions for the horizontal analytics preview
-  const previewQuestions = form?.questions?.slice(0, 2) || [];
+  // Extract top 5 questions for the analytics preview
+  const previewQuestions = form?.questions?.slice(0, 5) || [];
 
   return (
     <div className="space-y-6">
@@ -496,122 +526,155 @@ function FeedbackForm() {
                   onClick={() => setModal("responses")}
                 />
 
-                <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <p className="text-sm text-gray-500">Feedback Window</p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <span
-                      className={`inline-block h-2.5 w-2.5 rounded-full ${
-                        isWindowOpen ? "bg-green-500 animate-pulse" : "bg-gray-400"
-                      }`}
-                    />
-                    <p className="text-2xl font-bold text-[#24154f]">
-                      {isWindowOpen ? "Open" : "Closed"}
-                    </p>
+                <div className="rounded-xl border border-gray-200 bg-white p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-500">Feedback Window</p>
+                      {isWindowOpen && (
+                        <button
+                          type="button"
+                          onClick={unpublishForm}
+                          className="text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-md transition-colors"
+                          title="Revert form back to draft mode and stop receiving submissions"
+                        >
+                          Unpublish Form
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-full ${
+                          isWindowOpen ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                        }`}
+                      />
+                      <p className="text-2xl font-bold text-[#24154f]">
+                        {isWindowOpen ? "Open" : "Closed"}
+                      </p>
+                    </div>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
                     {isWindowOpen
-                      ? "Submissions active for 12 hours from publish"
+                      ? "Submissions active for 12 hours from publish. You can unpublish or edit anytime."
                       : "12-hour submission window completed"}
                   </p>
                 </div>
               </div>
 
-              {/* 6. PAST / CLOSED STATE: Large Horizontal Analytics Box */}
-              {!isWindowOpen && (
-                <>
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b pb-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <BarChart3 size={20} className="text-[#24154f]" />
-                          <h3 className="font-semibold text-gray-800">Feedback Analytics</h3>
-                        </div>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {form.responses?.length || 0} total student submissions analyzed
-                        </p>
+              {/* 6. ANALYTICS PREVIEW: Top 5 questions breakdown */}
+              {form?.responses?.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b pb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <BarChart3 size={20} className="text-[#24154f]" />
+                        <h3 className="font-semibold text-gray-800">Feedback Analytics (Top Questions)</h3>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setModal("analytics")}
-                        className="flex items-center gap-2 rounded-lg bg-[#24154f] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#36216f]"
-                      >
-                        <BarChart3 size={16} />
-                        View Full Analytics
-                      </button>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {form.responses?.length || 0} student submissions analyzed across {form.questions?.length || 0} questions
+                      </p>
                     </div>
 
-                    {/* Summary preview of 2 key review questions */}
-                    {previewQuestions.length > 0 && (
-                      <div className="mt-5 grid gap-4 md:grid-cols-2">
-                        {previewQuestions.map((q, idx) => (
-                          <div key={q.id} className="rounded-xl bg-gray-50 p-4">
-                            <p className="text-xs font-semibold text-purple-700">
-                              Question {idx + 1} Preview
-                            </p>
-                            <p className="mt-1 text-sm font-medium text-gray-800 line-clamp-1">
-                              {q.question}
-                            </p>
-                            <p className="mt-2 text-xs text-gray-500">
-                              {q.type === "textarea"
-                                ? `${form.responses?.length || 0} written responses recorded`
-                                : `${q.options?.length || 0} choices evaluated`}
-                            </p>
+                    <button
+                      type="button"
+                      onClick={() => setModal("analytics")}
+                      className="flex items-center gap-2 rounded-lg bg-[#24154f] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#36216f] transition-colors"
+                    >
+                      <BarChart3 size={16} />
+                      View Full Detailed Analytics
+                    </button>
+                  </div>
+
+                  {/* Top 5 Questions visual cards */}
+                  {previewQuestions.length > 0 && (
+                    <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {previewQuestions.map((q, idx) => {
+                        const totalSubmissions = form.responses?.length || 0;
+                        return (
+                          <div key={q.id || idx} className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-purple-700">
+                                  Q{idx + 1}
+                                </span>
+                                <span className="rounded bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 border border-gray-200 capitalize">
+                                  {q.type === "radio" ? "Single Choice" : q.type === "checkbox" ? "Multi Choice" : "Written"}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm font-medium text-gray-800 line-clamp-2">
+                                {q.question}
+                              </p>
+                            </div>
+
+                            <div className="mt-3 border-t border-gray-200/60 pt-2 text-xs text-gray-500">
+                              {q.type === "textarea" ? (
+                                <span className="font-medium text-purple-900">
+                                  {form.responses.filter((r) => r.answers?.[q.id]).length} written answers recorded
+                                </span>
+                              ) : (
+                                <span className="font-medium text-purple-900">
+                                  {q.options?.length || 0} choices · {totalSubmissions} responses
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 7. Response File Management */}
-                  <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">Response File</h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          View, export, and dispatch verified student response data to Admin.
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setModal("responses")}
-                          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          View Responses
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={exportCSV}
-                          className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                        >
-                          <Download size={16} />
-                          Export CSV
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setForms((items) =>
-                              items.map((item) =>
-                                item.eventId === selectedEvent.id
-                                  ? { ...item, responseSentToAdmin: true }
-                                  : item
-                              )
-                            );
-                            setToast("Response file sent to Admin.");
-                          }}
-                          disabled={form.responseSentToAdmin}
-                          className="flex items-center gap-2 rounded-lg bg-[#24154f] px-4 py-2 text-sm font-medium text-white hover:bg-[#36216f] disabled:opacity-50"
-                        >
-                          <Send size={16} />
-                          {form.responseSentToAdmin ? "Sent to Admin" : "Send to Admin"}
-                        </button>
-                      </div>
+                        );
+                      })}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* 7. Response File Management (Available during & after responses) */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Response File & Export</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      View real-time responses or export full questionnaire spreadsheet to Excel/CSV.
+                    </p>
                   </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setModal("responses")}
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      View Responses ({form.responses?.length || 0})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={exportCSV}
+                      disabled={!form.responses?.length}
+                      className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      title="Download Excel/CSV containing student info and answers to all questions"
+                    >
+                      <Download size={16} />
+                      Download Excel/CSV
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForms((items) =>
+                          items.map((item) =>
+                            item.eventId === selectedEvent.id
+                              ? { ...item, responseSentToAdmin: true }
+                              : item
+                          )
+                        );
+                        setToast("Feedback response file sent to Admin.");
+                      }}
+                      disabled={!form.responses?.length || form.responseSentToAdmin}
+                      className="flex items-center gap-2 rounded-lg bg-[#24154f] px-4 py-2 text-sm font-medium text-white hover:bg-[#36216f] disabled:opacity-50 transition-colors"
+                    >
+                      <Send size={16} />
+                      {form.responseSentToAdmin ? "Sent to Admin" : "Send to Admin"}
+                    </button>
+                  </div>
+                </div>
+              </div>
 
                   {/* 8. Analytics Report Upload */}
                   <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -660,8 +723,6 @@ function FeedbackForm() {
                       </div>
                     </div>
                   </div>
-                </>
-              )}
             </>
           )}
         </div>
@@ -1103,25 +1164,33 @@ function Analytics({ form, onClose }) {
               </p>
 
               <div className="mt-4 space-y-3">
-                {question.options.map((option) => {
+                {question.options.map((option, optIdx) => {
                   const matchCount = (form.responses || []).filter((r) => {
                     const ans = r.answers?.[question.id];
                     return Array.isArray(ans) ? ans.includes(option) : ans === option;
                   }).length;
 
                   const percentage = total > 0 ? Math.round((matchCount / total) * 100) : 0;
+                  const barColors = [
+                    "bg-[#4285f4]",
+                    "bg-[#ea4335]",
+                    "bg-[#fbbc05]",
+                    "bg-[#34a853]",
+                    "bg-[#8e24aa]",
+                  ];
+                  const barColor = barColors[optIdx % barColors.length];
 
                   return (
-                    <div key={option} className="space-y-1">
-                      <div className="flex justify-between text-xs font-medium text-gray-700">
+                    <div key={option} className="space-y-1.5 rounded-lg bg-gray-50/70 p-2.5">
+                      <div className="flex justify-between text-xs font-semibold text-gray-700">
                         <span>{option}</span>
-                        <span>
-                          {percentage}% ({matchCount})
+                        <span className="text-gray-900">
+                          {percentage}% ({matchCount} response{matchCount === 1 ? "" : "s"})
                         </span>
                       </div>
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
                         <div
-                          className="h-full rounded-full bg-purple-600 transition-all duration-500"
+                          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
