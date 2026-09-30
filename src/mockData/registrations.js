@@ -127,8 +127,9 @@ export const registrations = [
     studentId: "ST005",
     eventId: "EV007",
     registrationDate: "2027-11-03T08:45",
-    status: "registered",
-    qrCode: "QR-EV007-ST005"
+
+    status: "waitlisted",
+    qrCode: null
   },
 
   {
