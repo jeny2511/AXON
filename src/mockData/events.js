@@ -285,5 +285,223 @@ export const events = [
 
     certificateAvailable: false,
     feedbackRequired: true
+  },
+  // Test events for dynamic status checking
+  // Current date: 2026-09-29
+
+  {
+    id: "EV009",
+    name: "Cybersecurity Orientation",
+    category: "Seminar",
+    status: "upcoming",
+    registrationStatus: "open",
+
+    description:
+      "Upcoming test event for checking volunteer and student workflows.",
+
+    venue: "Seminar Hall 1",
+    eventDate: "2026-10-05",
+    startTime: "10:00",
+    endTime: "12:00",
+
+    poster: "",
+    speakerName: "TCF Team",
+
+    registrationOpen: "2026-09-25T09:00",
+    registrationClose: "2026-10-04T23:59",
+
+    attendanceOpen: "2026-10-05T10:00",
+    attendanceClose: "2026-10-05T12:15",
+
+    participantLimit: 100,
+    registeredCount: 42,
+
+    eligibleDepartments: ["ALL"],
+    eligibleYears: [1, 2, 3, 4],
+
+    rulebook: "",
+
+    certificateAvailable: true,
+    feedbackRequired: true
+  },
+
+  {
+    id: "EV010",
+    name: "Web Application Security Workshop",
+    category: "Workshop",
+    status: "upcoming",
+    registrationStatus: "open",
+
+    description:
+      "Upcoming test event for checking event-dependent volunteer workflows.",
+
+    venue: "Computer Lab 2",
+    eventDate: "2026-10-10",
+    startTime: "14:00",
+    endTime: "17:00",
+
+    poster: "",
+    speakerName: "TCF Security Team",
+
+    registrationOpen: "2026-09-28T09:00",
+    registrationClose: "2026-10-09T20:00",
+
+    attendanceOpen: "2026-10-10T14:00",
+    attendanceClose: "2026-10-10T17:15",
+
+    participantLimit: 80,
+    registeredCount: 55,
+
+    eligibleDepartments: ["IT", "CE", "ICT"],
+    eligibleYears: [2, 3, 4],
+
+    rulebook: "",
+
+    certificateAvailable: false,
+    feedbackRequired: true
+  },
+
+  {
+    id: "EV011",
+    name: "Live Network Defense Session",
+    category: "Workshop",
+    status: "ongoing",
+    registrationStatus: "closed",
+
+    description:
+      "Current-day test event for checking ongoing-state workflows.",
+
+    venue: "Cyber Security Lab",
+    eventDate: "2026-09-29",
+    startTime: "20:00",
+    endTime: "23:59",
+
+    poster: "",
+    speakerName: "TCF Blue Team",
+
+    registrationOpen: "2026-09-20T09:00",
+    registrationClose: "2026-09-29T19:30",
+
+    attendanceOpen: "2026-09-29T20:00",
+    attendanceClose: "2026-09-30T00:15",
+
+    participantLimit: 60,
+    registeredCount: 48,
+
+    eligibleDepartments: ["IT", "CE"],
+    eligibleYears: [2, 3],
+
+    rulebook: "",
+
+    certificateAvailable: true,
+    feedbackRequired: true
+  },
+
+  {
+    id: "EV012",
+    name: "Incident Response Drill",
+    category: "Competition",
+    status: "ongoing",
+    registrationStatus: "closed",
+
+    description:
+      "Current-day test event for checking ongoing-state workflows.",
+
+    venue: "Innovation Lab",
+    eventDate: "2026-09-29",
+    startTime: "18:00",
+    endTime: "23:59",
+
+    poster: "",
+    speakerName: "TCF Incident Response Team",
+
+    registrationOpen: "2026-09-22T09:00",
+    registrationClose: "2026-09-29T17:30",
+
+    attendanceOpen: "2026-09-29T18:00",
+    attendanceClose: "2026-09-30T00:15",
+
+    participantLimit: 70,
+    registeredCount: 61,
+
+    eligibleDepartments: ["IT", "CE", "ICT"],
+    eligibleYears: [2, 3, 4],
+
+    rulebook: "",
+
+    certificateAvailable: true,
+    feedbackRequired: false
+  },
+
+  {
+    id: "EV013",
+    name: "Digital Forensics Practice Lab",
+    category: "Workshop",
+    status: "past",
+    registrationStatus: "closed",
+
+    description:
+      "Past test event for checking completed-event workflows.",
+
+    venue: "Forensics Lab",
+    eventDate: "2026-09-28",
+    startTime: "10:00",
+    endTime: "13:00",
+
+    poster: "",
+    speakerName: "TCF Forensics Team",
+
+    registrationOpen: "2026-09-20T09:00",
+    registrationClose: "2026-09-27T23:59",
+
+    attendanceOpen: "2026-09-28T10:00",
+    attendanceClose: "2026-09-28T13:15",
+
+    participantLimit: 90,
+    registeredCount: 73,
+
+    eligibleDepartments: ["IT", "CE"],
+    eligibleYears: [2, 3],
+
+    rulebook: "",
+
+    certificateAvailable: true,
+    feedbackRequired: true
+  },
+
+  {
+    id: "EV014",
+    name: "Phishing Investigation Challenge",
+    category: "Competition",
+    status: "past",
+    registrationStatus: "closed",
+
+    description:
+      "Past test event for checking reports, certificates, feedback, and completed-event workflows.",
+
+    venue: "Cyber Security Lab",
+    eventDate: "2026-09-27",
+    startTime: "14:00",
+    endTime: "17:00",
+
+    poster: "",
+    speakerName: "TCF Threat Intelligence Team",
+
+    registrationOpen: "2026-09-18T09:00",
+    registrationClose: "2026-09-26T23:59",
+
+    attendanceOpen: "2026-09-27T14:00",
+    attendanceClose: "2026-09-27T17:15",
+
+    participantLimit: 100,
+    registeredCount: 86,
+
+    eligibleDepartments: ["ALL"],
+    eligibleYears: [1, 2, 3, 4],
+
+    rulebook: "",
+
+    certificateAvailable: true,
+    feedbackRequired: true
   }
 ];
