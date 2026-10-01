@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 
+import { users } from "../../mockData";
+
 const menuItems = [
   {
     name: "Dashboard",
@@ -135,23 +137,34 @@ function Sidebar({ isOpen, onClose }) {
         {/* Volunteer Profile */}
         {/* -------------------------------- */}
 
-        <div className="mx-3 mb-4 rounded-lg bg-[#332568] px-3 py-2.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-medium text-purple-700">
-              P
-            </div>
+        {(() => {
+          const currentVolunteer =
+            users.find((u) => u.id === "VL002") ||
+            users.find((u) => u.role === "volunteer");
+          const name = currentVolunteer?.fullName || "Dhruvi Patel";
+          const initial = name[0] || "D";
+          const designation = currentVolunteer?.designation || "President";
 
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium">
-                Preyas Shah
-              </p>
+          return (
+            <div className="mx-3 mb-4 rounded-lg bg-[#332568] px-3 py-2.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-purple-700">
+                  {initial}
+                </div>
 
-              <p className="mt-0.5 text-[10px] text-purple-200">
-                Volunteer
-              </p>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-white">
+                    {name}
+                  </p>
+
+                  <p className="mt-0.5 truncate text-[10px] text-purple-200">
+                    Volunteer · {designation}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* -------------------------------- */}
         {/* Main Menu */}
