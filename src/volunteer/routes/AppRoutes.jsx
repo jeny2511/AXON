@@ -7,10 +7,11 @@ import Reports from "../pages/Reports";
 import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
 import ManageEvents from "../pages/ManageEvents";
-import MyPresence from "../pages/MyPresence";
-import Profile from "../pages/Profile";
 import Registrations from "../pages/Registrations";
 import AttendanceSheet from "../pages/AttendanceSheet";
+import Dashboard from "../pages/Dashboard";
+import MyPresence from "../pages/MyPresence";
+import Profile from "../pages/Profile";
 
 function AppRoutes() {
   return (
@@ -35,11 +36,11 @@ function AppRoutes() {
       >
 
         {/* Dashboard */}
-        <Route index element={null} />
+        <Route index element={<Dashboard />} />
 
         {/* Main Menu */}
         <Route path="events" element={<ManageEvents />} />
-        <Route path="registrations" element={null} />
+        <Route path="registrations" element={<Registrations />} />
         <Route path="feedback" element={<FeedbackForm />} />
         <Route path="gallery" element={<EventGallery />} />
         <Route path="reports" element={<Reports />} />
