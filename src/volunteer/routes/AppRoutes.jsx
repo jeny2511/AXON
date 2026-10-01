@@ -8,22 +8,22 @@ import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
 import ManageEvents from "../pages/ManageEvents";
 import Registrations from "../pages/Registrations";
-import RegistrationSheet from "../pages/RegistrationSheet";
+import AttendanceSheet from "../pages/AttendanceSheet";
 
 function AppRoutes() {
   return (
     <Routes>
 
-      {/* Standalone Attendance Sheet (Opened in New Tab) */}
-      <Route
-        path="/volunteer/registrations/sheet"
-        element={<RegistrationSheet />}
-      />
-
       {/* Root */}
       <Route
         path="/"
         element={<Navigate to="/volunteer" replace />}
+      />
+
+      {/* Standalone Attendance Sheet for New Tab / Printing with Full Functionality */}
+      <Route
+        path="/volunteer/attendance-sheet/:eventId"
+        element={<AttendanceSheet />}
       />
 
       {/* Volunteer Module */}
