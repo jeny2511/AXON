@@ -1,11 +1,12 @@
-import { BrowserRouter } from "react-router-dom";
 import StudentRoutes from "./student/routes/StudentRoutes";
+import AppRoutes from "./volunteer/routes/AppRoutes";
 
 function App() {
   return (
-    <BrowserRouter>
+    <>
       <StudentRoutes />
-    </BrowserRouter>
+      <AppRoutes />
+    </>
   );
 }
 

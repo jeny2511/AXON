@@ -24,7 +24,7 @@ export const aboutTCF = {
       image: ""
     },
     {
-      name: "Meet Parmar",
+      name: "Ishika Sinojiya",
       role: "Vice President",
       image: ""
     },

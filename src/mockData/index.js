@@ -8,12 +8,16 @@ export { users } from "./users";
 export { registrations } from "./registrations";
 export { attendance } from "./attendance";
 export { feedback } from "./feedback";
+export { feedbackForms } from "./feedbackForms";
 export { certificates } from "./certificates";
 
 // Shared Data
 export { notifications } from "./notifications";
 export { gallery } from "./gallery";
 export { learning } from "./learning";
-// About TCF
 
+// Volunteer Data
+export { tasks } from "./tasks";
+
+// About TCF
 export { aboutTCF } from "./about";
