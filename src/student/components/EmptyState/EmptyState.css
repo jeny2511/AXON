@@ -1,0 +1,30 @@
+.empty-state {
+  max-width: 500px;
+  margin: 40px auto;
+  padding: 35px 25px;
+
+  background: #ffffff;
+
+  border: 1px dashed #e8e7ee;
+  border-radius: 14px;
+
+  text-align: center;
+}
+
+.empty-state h3 {
+  margin: 0;
+
+  color: #1f1f29;
+
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.empty-state p {
+  margin: 10px 0 0;
+
+  color: #737383;
+
+  font-size: 14px;
+  line-height: 1.5;
+}
