@@ -4,7 +4,6 @@ export { default as Header } from "./components/Header";
 export { default as Sidebar } from "./components/Sidebar";
 export { default as StatCard } from "./components/StatCard";
 export { default as UpcomingEvents } from "./components/UpcomingEvents";
-
 export { default as Dashboard } from "./pages/Dashboard";
 export { default as Events } from "./pages/Events";
 export { default as Volunteers } from "./pages/Volunteers";
