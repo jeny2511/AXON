@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -77,6 +77,7 @@ const menuItems = [
 ];
 
 function Sidebar({ isOpen, onClose }) {
+  const navigate = useNavigate();
   return (
     <>
       {/* Mobile overlay */}
@@ -138,9 +139,23 @@ function Sidebar({ isOpen, onClose }) {
         {/* -------------------------------- */}
 
         {(() => {
-          const currentVolunteer =
-            users.find((u) => u.id === "VL002") ||
-            users.find((u) => u.role === "volunteer");
+          let currentVolunteer = null;
+          try {
+            const stored = localStorage.getItem("axon_volunteer_user");
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              currentVolunteer = users.find(
+                (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
+              );
+            }
+          } catch (e) {}
+
+          if (!currentVolunteer) {
+            currentVolunteer =
+              users.find((u) => u.id === "VL002") ||
+              users.find((u) => u.role === "volunteer");
+          }
+
           const name = currentVolunteer?.fullName || "Dhruvi Patel";
           const initial = name[0] || "D";
           const designation = currentVolunteer?.designation || "President";
@@ -247,6 +262,11 @@ function Sidebar({ isOpen, onClose }) {
           {/* Logout */}
           <button
             type="button"
+            onClick={() => {
+              localStorage.removeItem("axon_volunteer_user");
+              if (onClose) onClose();
+              navigate("/volunteer/login");
+            }}
             className="mt-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-[12px] text-purple-100 transition-colors hover:bg-[#302263]"
           >
             <LogOut size={17} strokeWidth={1.8} />

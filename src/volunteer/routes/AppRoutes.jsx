@@ -12,16 +12,14 @@ import AttendanceSheet from "../pages/AttendanceSheet";
 import Dashboard from "../pages/Dashboard";
 import MyPresence from "../pages/MyPresence";
 import Profile from "../pages/Profile";
+import Login from "../pages/Login";
 
 function AppRoutes() {
   return (
     <Routes>
 
-      {/* Root */}
-      <Route
-        path="/"
-        element={<Navigate to="/volunteer" replace />}
-      />
+      {/* Login Route */}
+      <Route path="/volunteer/login" element={<Login />} />
 
       {/* Standalone Attendance Sheet for New Tab / Printing with Full Functionality */}
       <Route

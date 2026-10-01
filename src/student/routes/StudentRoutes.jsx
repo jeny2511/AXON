@@ -84,7 +84,7 @@ function StudentRoutes() {
       />
 
       {/* Catch-all fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" />} />
+      {/* <Route path="*" element={<Navigate to="/dashboard" />} /> */}
     </Routes>
   );
 }

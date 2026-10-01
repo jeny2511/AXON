@@ -36,8 +36,19 @@ function formatTime(timeStr) {
 function MyPresence() {
   const [search, setSearch] = useState("");
 
-  // Current logged in volunteer (Dhruvi Patel)
+  // Current logged in volunteer
   const currentVolunteer = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("axon_volunteer_user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const match = users.find(
+          (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
+        );
+        if (match) return match;
+      }
+    } catch (e) {}
+
     return (
       users.find((u) => u.id === "VL002") ||
       users.find((u) => u.role === "volunteer") || {
@@ -66,6 +77,8 @@ function MyPresence() {
       ...new Set(
         markedEventIds.length
           ? markedEventIds
+          : volunteerId === "VL001"
+          ? ["EV001", "EV004", "EV011"]
           : ["EV005", "EV013", "EV014"]
       ),
     ];

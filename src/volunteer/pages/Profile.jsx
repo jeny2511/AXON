@@ -17,8 +17,19 @@ import {
 import { users } from "../../mockData";
 
 function Profile() {
-  // Current active volunteer user (Dhruvi Patel from mock data)
+  // Current active volunteer user
   const currentVolunteer = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("axon_volunteer_user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const match = users.find(
+          (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
+        );
+        if (match) return match;
+      }
+    } catch (e) {}
+
     return (
       users.find((u) => u.id === "VL002") ||
       users.find((u) => u.role === "volunteer") || {
