@@ -7,6 +7,7 @@ import Reports from "../pages/Reports";
 import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
 import ManageEvents from "../pages/ManageEvents";
+import MyPresence from "../pages/MyPresence";
 import Profile from "../pages/Profile";
 
 function AppRoutes() {
@@ -36,7 +37,7 @@ function AppRoutes() {
         <Route path="reports" element={<Reports />} />
         <Route path="certificates" element={<Certificates />} />
         <Route path="tasks" element={<Tasks />} />
-        <Route path="presence" element={null} />
+        <Route path="presence" element={<MyPresence />} />
         <Route path="learning" element={<LearningHub />} />
         <Route path="notifications" element={null} />
 
