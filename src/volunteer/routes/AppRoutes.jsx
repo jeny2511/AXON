@@ -7,6 +7,7 @@ import Reports from "../pages/Reports";
 import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
 import ManageEvents from "../pages/ManageEvents";
+import Profile from "../pages/Profile";
 
 function AppRoutes() {
   return (
@@ -40,7 +41,7 @@ function AppRoutes() {
         <Route path="notifications" element={null} />
 
         {/* Bottom Menu */}
-        <Route path="profile" element={null} />
+        <Route path="profile" element={<Profile />} />
 
       </Route>
 
