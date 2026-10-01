@@ -1,17 +1,10 @@
-import "./index.css";
+import Layout from "./volunteer/components/Layout";
 
 function App() {
   return (
-    <div className="app-foundation">
-      <h1>AXON</h1>
-      <p>TCF Centralized Event Management Platform</p>
-
-      <div className="modules">
-        <div className="module-card student">Student Module</div>
-        <div className="module-card volunteer">Volunteer Module</div>
-        <div className="module-card admin">Admin Module</div>
-      </div>
-    </div>
+    <Layout>
+      {/* Page content will be added here later */}
+    </Layout>
   );
 }
 
