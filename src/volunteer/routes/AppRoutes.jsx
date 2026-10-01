@@ -7,10 +7,18 @@ import Reports from "../pages/Reports";
 import Tasks from "../pages/Tasks";
 import EventGallery from "../pages/EventGallery";
 import ManageEvents from "../pages/ManageEvents";
+import Registrations from "../pages/Registrations";
+import RegistrationSheet from "../pages/RegistrationSheet";
 
 function AppRoutes() {
   return (
     <Routes>
+
+      {/* Standalone Attendance Sheet (Opened in New Tab) */}
+      <Route
+        path="/volunteer/registrations/sheet"
+        element={<RegistrationSheet />}
+      />
 
       {/* Root */}
       <Route
@@ -29,7 +37,7 @@ function AppRoutes() {
 
         {/* Main Menu */}
         <Route path="events" element={<ManageEvents />} />
-        <Route path="registrations" element={null} />
+        <Route path="registrations" element={<Registrations />} />
         <Route path="feedback" element={<FeedbackForm />} />
         <Route path="gallery" element={<EventGallery />} />
         <Route path="reports" element={<Reports />} />
