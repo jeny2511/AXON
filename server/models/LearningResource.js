@@ -68,10 +68,23 @@ const learningResourceSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    author: {
+      type: String,
+      default: "TCF Editorial Team",
+      trim: true,
+    },
+    publishedDate: {
+      type: Date,
+      default: Date.now,
+    },
+    resourceLink: {
+      type: String,
+      default: "#",
+    },
     authorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Author reference is required"],
+      default: null,
     },
     // Soft Delete (Section 18)
     isDeleted: {
@@ -91,8 +104,14 @@ const learningResourceSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+learningResourceSchema.virtual("resourceId").get(function () {
+  return this._id.toString();
+});
 
 learningResourceSchema.index({ title: "text", description: "text", content: "text", tags: "text" });
 

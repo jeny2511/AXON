@@ -35,6 +35,11 @@ const registrationSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    qrCode: {
+      type: String,
+      default: "", // e.g. QR-EV001-ST001
+      index: true,
+    },
     // Soft Delete (Section 18)
     isDeleted: {
       type: Boolean,
@@ -53,8 +58,20 @@ const registrationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Frontend aliases
+registrationSchema
+  .virtual("registrationDate")
+  .get(function () { return this.registeredAt; })
+  .set(function (val) { this.registeredAt = val; });
+
+registrationSchema.virtual("registrationId").get(function () {
+  return this._id.toString();
+});
 
 // Enforce ONE registration per student per event for active registrations
 registrationSchema.index(

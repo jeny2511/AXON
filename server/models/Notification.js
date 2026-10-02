@@ -39,6 +39,11 @@ const notificationSchema = new mongoose.Schema(
         "reminder",
         "feedback",
         "general",
+        // Frontend mockData type compatibility
+        "registration",
+        "deadline",
+        "reschedule",
+        "certificate",
       ],
       default: "general",
       index: true,
@@ -84,8 +89,33 @@ const notificationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Frontend aliases
+notificationSchema
+  .virtual("userId")
+  .get(function () { return this.recipientId; })
+  .set(function (val) { this.recipientId = val; });
+
+notificationSchema
+  .virtual("eventId")
+  .get(function () { return this.relatedEntityId; })
+  .set(function (val) {
+    this.relatedEntityId = val;
+    this.relatedEntityType = "event";
+  });
+
+notificationSchema
+  .virtual("isRead")
+  .get(function () { return this.read; })
+  .set(function (val) { this.read = val; });
+
+notificationSchema.virtual("notificationId").get(function () {
+  return this._id.toString();
+});
 
 notificationSchema.index({ recipientId: 1, read: 1, createdAt: -1 });
 

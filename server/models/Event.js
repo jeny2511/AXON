@@ -200,6 +200,10 @@ const eventSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    registeredCount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -211,6 +215,90 @@ const eventSchema = new mongoose.Schema(
 // Virtual: Effective End Date
 eventSchema.virtual("effectiveEndDate").get(function () {
   return this.endDate || this.date;
+});
+
+// Frontend aliases: allows client code to use eventDate, speakerName, participantLimit, etc. seamlessly
+eventSchema
+  .virtual("eventDate")
+  .get(function () { return this.date; })
+  .set(function (val) { this.date = val; });
+
+eventSchema
+  .virtual("eventEndDate")
+  .get(function () { return this.endDate; })
+  .set(function (val) { this.endDate = val; });
+
+eventSchema
+  .virtual("speakerName")
+  .get(function () { return this.speaker; })
+  .set(function (val) { this.speaker = val; });
+
+eventSchema
+  .virtual("participantLimit")
+  .get(function () { return this.participantsLimit; })
+  .set(function (val) { this.participantsLimit = val; });
+
+eventSchema
+  .virtual("registrationOpen")
+  .get(function () { return this.registration?.openAt; })
+  .set(function (val) {
+    if (!this.registration) this.registration = {};
+    this.registration.openAt = val;
+  });
+
+eventSchema
+  .virtual("registrationClose")
+  .get(function () { return this.registration?.closeAt; })
+  .set(function (val) {
+    if (!this.registration) this.registration = {};
+    this.registration.closeAt = val;
+  });
+
+eventSchema
+  .virtual("attendanceOpen")
+  .get(function () { return this.attendance?.openAt; })
+  .set(function (val) {
+    if (!this.attendance) this.attendance = {};
+    this.attendance.openAt = val;
+  });
+
+eventSchema
+  .virtual("attendanceClose")
+  .get(function () { return this.attendance?.closeAt; })
+  .set(function (val) {
+    if (!this.attendance) this.attendance = {};
+    this.attendance.closeAt = val;
+  });
+
+eventSchema
+  .virtual("eligibleDepartments")
+  .get(function () { return this.eligibility?.branchCodes || []; })
+  .set(function (val) {
+    if (!this.eligibility) this.eligibility = {};
+    this.eligibility.branchCodes = val;
+    this.eligibility.enabled = Array.isArray(val) && val.length > 0;
+  });
+
+eventSchema
+  .virtual("eligibleYears")
+  .get(function () { return this.eligibility?.years || []; })
+  .set(function (val) {
+    if (!this.eligibility) this.eligibility = {};
+    this.eligibility.years = val;
+    this.eligibility.enabled = Array.isArray(val) && val.length > 0;
+  });
+
+eventSchema
+  .virtual("rulebook")
+  .get(function () { return this.rulebooks?.[0]?.url || ""; })
+  .set(function (val) {
+    if (val) {
+      this.rulebooks = [{ name: "Event Rulebook", url: val, type: "pdf" }];
+    }
+  });
+
+eventSchema.virtual("registrationStatus").get(function () {
+  return this.status;
 });
 
 // Indexes for fast searching and filtering

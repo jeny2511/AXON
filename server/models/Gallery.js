@@ -79,8 +79,29 @@ const gallerySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Frontend aliases
+gallerySchema
+  .virtual("coverImage")
+  .get(function () { return this.banner; })
+  .set(function (val) { this.banner = val; });
+
+gallerySchema
+  .virtual("eventDate")
+  .get(function () { return this.date; })
+  .set(function (val) { this.date = val; });
+
+gallerySchema.virtual("totalPhotos").get(function () {
+  return Array.isArray(this.photos) ? this.photos.length : 0;
+});
+
+gallerySchema.virtual("galleryId").get(function () {
+  return this._id.toString();
+});
 
 gallerySchema.index({ eventName: "text", description: "text", tags: "text" });
 

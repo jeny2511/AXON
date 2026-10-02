@@ -59,17 +59,17 @@ const userSchema = new mongoose.Schema(
       default: "regular",
       index: true, // Used to distinguish 4-year degree (regular) vs 3-year lateral entry (d2d)
     },
+    department: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "", // Department (e.g. IT, CE, ICT, EC)
+      index: true,
+    },
     branch: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Branch",
       default: null,
-    },
-    // Optional fallback string field if branch code/name is passed directly
-    branchCode: {
-      type: String,
-      trim: true,
-      uppercase: true,
-      default: "",
     },
     batch: {
       startYear: {
@@ -214,6 +214,38 @@ userSchema.virtual("academicStatus").get(function () {
   return this.currentYear ? "studying" : "graduated";
 });
 
+// Frontend aliases: allows client code to use name, enrollmentNo, year, semester, phone seamlessly
+userSchema
+  .virtual("name")
+  .get(function () { return this.fullName; })
+  .set(function (val) { this.fullName = val; });
+
+userSchema
+  .virtual("enrollmentNo")
+  .get(function () { return this.enrollmentNumber; })
+  .set(function (val) { this.enrollmentNumber = val; });
+
+userSchema.virtual("year").get(function () {
+  const y = this.currentYear;
+  if (!y) return "";
+  const suffix = y === 1 ? "1st Year" : y === 2 ? "2nd Year" : y === 3 ? "3rd Year" : "4th Year";
+  return suffix;
+});
+
+// Dynamic semester: GTU odd semesters (1, 3, 5, 7) run July-Dec; even semesters (2, 4, 6, 8) run Jan-June
+userSchema.virtual("semester").get(function () {
+  const y = this.currentYear;
+  if (!y) return null;
+  const month = new Date().getMonth() + 1;
+  const isOddSem = month >= 7 && month <= 12;
+  return isOddSem ? 2 * (y - 1) + 1 : 2 * y;
+});
+
+userSchema
+  .virtual("phone")
+  .get(function () { return this.phoneNumber; })
+  .set(function (val) { this.phoneNumber = val; });
+
 /**
  * Static Helper: getRegistrationOptions
  * Dynamically provides ONLY ACTIVE (non-graduated) Year & Batch options for registration:
@@ -273,8 +305,44 @@ userSchema.statics.getRegistrationOptions = function (admissionType = "regular")
   }
 };
 
-// Validate that newly registered students cannot register for an expired/graduated batch
+// Virtual: Confirm Password (used in registration form validation)
+userSchema
+  .virtual("confirmPassword")
+  .set(function (val) {
+    this._confirmPassword = val;
+  })
+  .get(function () {
+    return this._confirmPassword;
+  });
+
+// Role-based validation rules for Student, Volunteer, and Admin
 userSchema.pre("validate", function (next) {
+  // Confirm password match check (if confirmPassword was provided)
+  if (this.isModified("password") && this._confirmPassword !== undefined) {
+    if (this.password !== this._confirmPassword) {
+      return next(new Error("Password and confirm password do not match."));
+    }
+  }
+
+  // Student registration validation
+  if (this.role === "student") {
+    if (!this.enrollmentNumber) return next(new Error("Enrollment number is required for students."));
+    if (!this.phoneNumber) return next(new Error("Phone number is required for students."));
+    if (!this.department && !this.branch) return next(new Error("Department is required for students."));
+    if (!this.batch || !this.batch.startYear || !this.batch.endYear) return next(new Error("Batch is required for students."));
+  }
+
+  // Volunteer registration validation (Admin-created)
+  if (this.role === "volunteer") {
+    if (!this.enrollmentNumber) return next(new Error("Enrollment number is required for volunteers."));
+    if (!this.phoneNumber) return next(new Error("Phone number is required for volunteers."));
+    if (!this.department && !this.branch) return next(new Error("Department is required for volunteers."));
+    if (!this.batch || !this.batch.startYear || !this.batch.endYear) return next(new Error("Batch is required for volunteers."));
+    if (!this.profilePhoto) return next(new Error("Profile photo is compulsory for volunteers."));
+    if (!this.committeePosition) return next(new Error("Committee position is required for volunteers."));
+  }
+
+  // Validate that newly registered students cannot register for an expired/graduated batch
   if (this.isNew && this.role === "student" && this.batch && this.batch.startYear && this.batch.endYear) {
     const now = new Date();
     const calYear = now.getFullYear();
@@ -311,11 +379,53 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+/**
+ * Static Helper: findByLoginIdentifier
+ * Powers the Common Login Page:
+ * Allows Admin, Volunteer, or Student to login with EITHER Email OR Enrollment Number.
+ */
+userSchema.statics.findByLoginIdentifier = function (identifier) {
+  if (!identifier) return null;
+  const trimmed = String(identifier).trim();
+  return this.findOne({
+    $or: [
+      { email: trimmed.toLowerCase() },
+      { enrollmentNumber: trimmed.toUpperCase() },
+    ],
+    isDeleted: false,
+  }).select("+password +otp +otpExpiresAt");
+};
+
+/**
+ * Static Helper: seedDefaultAdmin
+ * Seeds the hardcoded AXON Admin account if it does not already exist in MongoDB.
+ */
+userSchema.statics.seedDefaultAdmin = async function () {
+  const existingAdmin = await this.findOne({ role: "admin", isDeleted: false });
+  if (existingAdmin) {
+    return existingAdmin;
+  }
+  const admin = await this.create({
+    role: "admin",
+    fullName: "TCF Admin",
+    email: process.env.ADMIN_EMAIL || "admin@axon.demo",
+    password: process.env.ADMIN_PASSWORD || "Admin@123",
+    emailVerified: true,
+    accountStatus: "active",
+  });
+  console.log(`✅ [Database] Default Admin created: ${admin.email}`);
+  return admin;
+};
+
 // Compound index for enrollment unique per role (active users)
 userSchema.index(
   { enrollmentNumber: 1, role: 1 },
   { unique: true, partialFilterExpression: { enrollmentNumber: { $type: "string" }, isDeleted: false } }
 );
+
+// Index for common login by email or enrollment
+userSchema.index({ email: 1, isDeleted: 1 });
+userSchema.index({ enrollmentNumber: 1, isDeleted: 1 });
 
 const User = mongoose.model("User", userSchema);
 export default User;

@@ -45,7 +45,7 @@ const studentAttendanceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["present", "absent"],
+      enum: ["present", "absent", "pending"],
       default: "present",
     },
     // Soft Delete (Section 18)
@@ -66,8 +66,20 @@ const studentAttendanceSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Frontend aliases: verifiedBy maps to markedBy, attendanceId maps to _id
+studentAttendanceSchema
+  .virtual("verifiedBy")
+  .get(function () { return this.markedBy; })
+  .set(function (val) { this.markedBy = val; });
+
+studentAttendanceSchema.virtual("attendanceId").get(function () {
+  return this._id.toString();
+});
 
 // Enforce exactly ONE attendance record per student per event
 studentAttendanceSchema.index(
