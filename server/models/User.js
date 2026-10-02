@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
  * - Single central users collection.
  * - Profile photo is compulsory for students and volunteers.
  * - Batch stores degree duration ({ startYear, endYear }). Current academic year is calculated, NOT permanently stored.
- * - Volunteers are Admin-created, have committeePosition and workingUnder (referencing another volunteer/user).
+ * - Volunteers are Admin-created and have committeePosition.
  * - Soft-delete enabled.
  */
 const userSchema = new mongoose.Schema(
@@ -97,11 +97,6 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "CommitteePosition",
       default: null,
-    },
-    workingUnder: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null, // References another volunteer/user
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -378,6 +373,31 @@ userSchema.pre("save", async function (next) {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+/**
+ * Method: matchPassword
+ * Validates entered password against bcrypt hash
+ */
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+/**
+ * Pre-save hook: Hash password if modified
+ */
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
+  // If already hashed, skip
+  if (/^\$2[aby]\$\d{2}\$/.test(this.password)) {
+    return next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
 
 /**
  * Static Helper: findByLoginIdentifier

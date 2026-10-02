@@ -40,7 +40,7 @@ const certificateSchema = new mongoose.Schema(
     },
     pdfUrl: {
       type: String,
-      required: [true, "PDF URL is required"],
+      default: "",
       trim: true,
     },
     verificationCode: {

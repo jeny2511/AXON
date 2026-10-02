@@ -20,6 +20,7 @@ import EmailTemplate, { EmailSendRecord } from "./EmailTemplate.js";
 import AuditLog from "./AuditLog.js";
 import GlobalSettings from "./GlobalSettings.js";
 import AboutTCF from "./AboutTCF.js";
+import OTP from "./OTP.js";
 
 export {
   User,
@@ -46,6 +47,7 @@ export {
   AuditLog,
   GlobalSettings,
   AboutTCF,
+  OTP,
 };
 
 export default {
@@ -73,4 +75,5 @@ export default {
   AuditLog,
   GlobalSettings,
   AboutTCF,
+  OTP,
 };

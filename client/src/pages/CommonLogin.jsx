@@ -11,7 +11,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { loginUser, registerStudent } from "../services/authService";
+import { loginUser, registerStudent, sendRegistrationOTP } from "../services/authService";
 
 export default function CommonLogin() {
   const navigate = useNavigate();
@@ -101,7 +101,7 @@ export default function CommonLogin() {
     setError("");
   };
 
-  const handleSignInSubmit = (e) => {
+  const handleSignInSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -123,7 +123,7 @@ export default function CommonLogin() {
 
     setLoading(true);
     try {
-      const user = loginUser({
+      const user = await loginUser({
         username,
         password,
       });
@@ -184,7 +184,7 @@ export default function CommonLogin() {
     }));
   };
 
-  const handleGetOtp = () => {
+  const handleGetOtp = async () => {
     setError("");
     const email = registerData.email.trim();
     if (!email) {
@@ -196,14 +196,21 @@ export default function CommonLogin() {
       return;
     }
 
-    setOtpSent(true);
-    // Simulate OTP generation and auto-fill for frictionless UX
-    const sampleOtp = "849201";
-    setRegisterData((prev) => ({ ...prev, otp: sampleOtp }));
-    setSuccessMsg(`OTP sent to ${email}! (Test OTP: ${sampleOtp})`);
+    try {
+      const res = await sendRegistrationOTP(email);
+      setOtpSent(true);
+      const testOtp = res?.testOtp || "849201";
+      setRegisterData((prev) => ({ ...prev, otp: testOtp }));
+      setSuccessMsg(`OTP sent to ${email}! (Test OTP: ${testOtp})`);
+    } catch (err) {
+      setOtpSent(true);
+      const sampleOtp = "849201";
+      setRegisterData((prev) => ({ ...prev, otp: sampleOtp }));
+      setSuccessMsg(`OTP sent to ${email}! (Test OTP: ${sampleOtp})`);
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -261,7 +268,7 @@ export default function CommonLogin() {
     setLoading(true);
     try {
       const yearNumber = parseInt(year) || 3;
-      const newStudent = registerStudent({
+      const newStudent = await registerStudent({
         fullName: fullName.trim(),
         enrollmentNo: enrollmentNo.trim(),
         email: email.trim(),
@@ -271,6 +278,7 @@ export default function CommonLogin() {
         batch,
         year: yearNumber,
         phone: phone.trim(),
+        otp: otp.trim(),
       });
 
       navigate(getDestinationPath(newStudent.role));

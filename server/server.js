@@ -1,6 +1,15 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Explicitly resolve server/.env
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+
 import connectDB from "./config/db.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -17,9 +26,7 @@ import learningRoutes from "./routes/learningRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
-
-// Load environment variables
-dotenv.config();
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 // Connect to Database
 connectDB();
@@ -56,6 +63,7 @@ app.use("/api/learning", learningRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Central Error Handling Middleware
 app.use(notFound);

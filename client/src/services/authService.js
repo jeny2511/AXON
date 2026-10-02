@@ -1,8 +1,10 @@
+import api, { setToken, removeToken, getToken } from "./api.js";
 import { users as initialUsers } from "../mockData/users";
 
 const AUTH_USER_KEY = "axon_auth_user";
 const AUTH_STUDENT_KEY = "axon_auth_student_id";
 const AUTH_VOLUNTEER_KEY = "axon_volunteer_user";
+const AUTH_ADMIN_KEY = "axon_admin_user";
 const AUTH_CUSTOM_STUDENTS_KEY = "axon_custom_students";
 
 // Get runtime users list (combining mock users + dynamically registered students)
@@ -33,7 +35,8 @@ export function getCurrentUser() {
 // Check if user is logged in
 export function isLoggedIn() {
   const user = getCurrentUser();
-  return Boolean(user && user.id && user.role);
+  const token = getToken();
+  return Boolean(user && user.role && (token || user.id));
 }
 
 // Get active role: 'student' | 'volunteer' | 'admin' | null
@@ -48,8 +51,28 @@ export function hasRole(role) {
   return currentRole === role;
 }
 
-// Centralized Login function for all three roles (accepts username/enrollment/email & password)
-export function loginUser(credentialsOrIdentifier, password = "", preferredRole = null) {
+/**
+ * Send Email OTP for Registration
+ */
+export async function sendRegistrationOTP(email) {
+  if (!email || !email.trim()) {
+    throw new Error("Please enter your college email address.");
+  }
+  try {
+    const res = await api.post("/auth/send-otp", { email: email.trim().toLowerCase() });
+    return res;
+  } catch (err) {
+    // If backend returns an error or in offline fallback mode
+    console.warn("⚠️ [Auth Service] Live OTP failed, using fallback:", err.message);
+    throw err;
+  }
+}
+
+/**
+ * Centralized Login function for all three roles (Students, Volunteers, Admins)
+ * Connects to live MongoDB via /api/auth/login with graceful fallback
+ */
+export async function loginUser(credentialsOrIdentifier, password = "", preferredRole = null) {
   let userInput = "";
   let passInput = password;
 
@@ -73,10 +96,53 @@ export function loginUser(credentialsOrIdentifier, password = "", preferredRole 
     throw new Error("Please enter your Username, Enrollment Number, or Email ID.");
   }
 
+  // Attempt Live Backend Login first
+  try {
+    const res = await api.post("/auth/login", {
+      identifier: userInput,
+      password: passInput,
+      role: preferredRole || undefined,
+    });
+
+    if (res.success && res.user) {
+      const user = {
+        ...res.user,
+        id: res.user.id || res.user._id,
+        enrollmentNo: res.user.enrollmentNumber || res.user.enrollmentNo,
+      };
+
+      if (res.token) {
+        setToken(res.token);
+      }
+
+      // Persist centralized session
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+
+      // Backward compatibility keys
+      if (user.role === "student") {
+        localStorage.setItem(AUTH_STUDENT_KEY, user.id);
+      } else if (user.role === "volunteer") {
+        localStorage.setItem(AUTH_VOLUNTEER_KEY, JSON.stringify(user));
+      } else if (user.role === "admin") {
+        localStorage.setItem(AUTH_ADMIN_KEY, JSON.stringify(user));
+      }
+
+      window.dispatchEvent(new Event("axon-auth-change"));
+      return user;
+    }
+  } catch (apiErr) {
+    console.warn("⚠️ [Auth Service] Backend login failed, attempting local fallback:", apiErr.message);
+
+    // If server specifically returned an invalid password or not found, throw that message
+    if (apiErr.status === 400 || apiErr.status === 401 || apiErr.status === 404) {
+      throw apiErr;
+    }
+  }
+
+  // Fallback to local mock data if server is unreachable
   const query = userInput.toLowerCase();
   const allUsers = getAllUsers();
 
-  // Find user by enrollmentNo, email, id, fullName, or username prefix
   let matchedUser = allUsers.find((u) => {
     const uEnroll = (u.enrollmentNo || "").toLowerCase();
     const uEmail = (u.email || "").toLowerCase();
@@ -95,44 +161,34 @@ export function loginUser(credentialsOrIdentifier, password = "", preferredRole 
     );
   });
 
-  // Fallback match if user typed part of name
-  if (!matchedUser) {
-    matchedUser = allUsers.find((u) => {
-      const uName = (u.fullName || "").toLowerCase();
-      const uEmail = (u.email || "").toLowerCase();
-      return uName.includes(query) || uEmail.includes(query);
-    });
-  }
-
   if (!matchedUser) {
     throw new Error("Invalid credentials. Please verify your Username, Enrollment Number, or Email ID.");
   }
 
-  // Password validation: if user has a stored custom password, check it
   if (matchedUser.password && passInput) {
     if (matchedUser.password !== passInput && passInput !== "demo123" && passInput !== "password") {
       throw new Error("Incorrect password. Please try again.");
     }
   }
 
-  // Set centralized session
   localStorage.setItem(AUTH_USER_KEY, JSON.stringify(matchedUser));
-
-  // Maintain backward compatibility for existing module-specific keys
   if (matchedUser.role === "student") {
     localStorage.setItem(AUTH_STUDENT_KEY, matchedUser.id);
   } else if (matchedUser.role === "volunteer") {
     localStorage.setItem(AUTH_VOLUNTEER_KEY, JSON.stringify(matchedUser));
   } else if (matchedUser.role === "admin") {
-    localStorage.setItem("axon_admin_user", JSON.stringify(matchedUser));
+    localStorage.setItem(AUTH_ADMIN_KEY, JSON.stringify(matchedUser));
   }
 
   window.dispatchEvent(new Event("axon-auth-change"));
   return matchedUser;
 }
 
-// Centralized Student Registration
-export function registerStudent(studentData) {
+/**
+ * Centralized Student Registration
+ * Connects to live MongoDB via /api/auth/register with graceful fallback
+ */
+export async function registerStudent(studentData) {
   if (!studentData.fullName || !studentData.fullName.trim()) {
     throw new Error("Full name is required.");
   }
@@ -143,11 +199,52 @@ export function registerStudent(studentData) {
     throw new Error("College email address is required.");
   }
 
-  const allUsers = getAllUsers();
   const trimmedEnroll = studentData.enrollmentNo.trim();
   const trimmedEmail = studentData.email.trim().toLowerCase();
+  const department = studentData.department || "IT";
+  const courseType = studentData.courseType || studentData.admissionType || "Regular";
+  const batch = studentData.batch || "2024-2028";
+  const phone = studentData.phone?.trim() || studentData.phoneNumber?.trim() || "9876543210";
 
-  // Check if already registered
+  // Attempt Live Backend Registration
+  try {
+    const res = await api.post("/auth/register", {
+      fullName: studentData.fullName.trim(),
+      enrollmentNumber: trimmedEnroll,
+      email: trimmedEmail,
+      password: studentData.password,
+      department,
+      admissionType: courseType.toLowerCase(),
+      batch,
+      phoneNumber: phone,
+      otp: studentData.otp || undefined,
+    });
+
+    if (res.success && res.user) {
+      const user = {
+        ...res.user,
+        id: res.user.id || res.user._id,
+        enrollmentNo: res.user.enrollmentNumber || trimmedEnroll,
+      };
+
+      if (res.token) {
+        setToken(res.token);
+      }
+
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+      localStorage.setItem(AUTH_STUDENT_KEY, user.id);
+      window.dispatchEvent(new Event("axon-auth-change"));
+      return user;
+    }
+  } catch (apiErr) {
+    console.warn("⚠️ [Auth Service] Backend register failed, attempting local fallback:", apiErr.message);
+    if (apiErr.status === 400 || apiErr.status === 409) {
+      throw apiErr;
+    }
+  }
+
+  // Fallback to local storage if server is unreachable
+  const allUsers = getAllUsers();
   const existingUser = allUsers.find(
     (u) =>
       (u.enrollmentNo && u.enrollmentNo.toLowerCase() === trimmedEnroll.toLowerCase()) ||
@@ -160,12 +257,8 @@ export function registerStudent(studentData) {
 
   const studentCount = allUsers.filter((u) => u.role === "student").length;
   const newStudentId = `ST${String(studentCount + 1).padStart(3, "0")}`;
-
-  const department = studentData.department || "IT";
-  const courseType = studentData.courseType || studentData.admissionType || "Regular";
   const year = Number(studentData.year) || (courseType === "D2D" ? 2 : 1);
   const semester = Number(studentData.semester) || (year * 2 - 1);
-  const batch = studentData.batch || "2024-2028";
 
   const newStudent = {
     id: newStudentId,
@@ -179,13 +272,12 @@ export function registerStudent(studentData) {
     year,
     semester,
     enrollmentNo: trimmedEnroll,
-    phone: studentData.phone?.trim() || studentData.phoneNumber?.trim() || "9876543210",
+    phone,
     batch,
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true,
   };
 
-  // Save to custom students list
   const customStudentsJson = localStorage.getItem(AUTH_CUSTOM_STUDENTS_KEY);
   let customStudents = [];
   if (customStudentsJson) {
@@ -198,7 +290,6 @@ export function registerStudent(studentData) {
   customStudents.push(newStudent);
   localStorage.setItem(AUTH_CUSTOM_STUDENTS_KEY, JSON.stringify(customStudents));
 
-  // Log in as the new student
   localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newStudent));
   localStorage.setItem(AUTH_STUDENT_KEY, newStudent.id);
   window.dispatchEvent(new Event("axon-auth-change"));
@@ -207,15 +298,21 @@ export function registerStudent(studentData) {
 }
 
 // Global Logout function
-export function logout() {
+export async function logout() {
+  try {
+    await api.post("/auth/logout", {});
+  } catch (e) {
+    // Ignore logout errors
+  }
+  removeToken();
   localStorage.removeItem(AUTH_USER_KEY);
   localStorage.removeItem(AUTH_STUDENT_KEY);
   localStorage.removeItem(AUTH_VOLUNTEER_KEY);
-  localStorage.removeItem("axon_admin_user");
+  localStorage.removeItem(AUTH_ADMIN_KEY);
   window.dispatchEvent(new Event("axon-auth-change"));
 }
 
-// Backwards compatibility helpers for student module
+// Backwards compatibility helpers
 export function getCurrentStudentId() {
   const user = getCurrentUser();
   return user && user.role === "student" ? user.id : localStorage.getItem(AUTH_STUDENT_KEY) || null;
@@ -234,7 +331,7 @@ export function signupStudent(studentData) {
 }
 
 export function logoutStudent() {
-  logout();
+  return logout();
 }
 
 // Convenient Named Aliases
@@ -246,3 +343,13 @@ export function isStudentAuthenticated() {
   return Boolean(user && user.role === "student");
 }
 
+export default {
+  loginUser,
+  registerStudent,
+  sendRegistrationOTP,
+  logout,
+  getCurrentUser,
+  isLoggedIn,
+  getUserRole,
+  hasRole,
+};

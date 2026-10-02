@@ -217,7 +217,12 @@ eventSchema.virtual("effectiveEndDate").get(function () {
   return this.endDate || this.date;
 });
 
-// Frontend aliases: allows client code to use eventDate, speakerName, participantLimit, etc. seamlessly
+// Frontend aliases: allows client code to use eventDate, speakerName, participantLimit, title, etc. seamlessly
+eventSchema
+  .virtual("title")
+  .get(function () { return this.name; })
+  .set(function (val) { this.name = val; });
+
 eventSchema
   .virtual("eventDate")
   .get(function () { return this.date; })

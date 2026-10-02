@@ -108,7 +108,6 @@ export const users = [
     batch: "2024-2028",
     committee: "Technical",
     designation: "Technical Lead",
-    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/preyas.jpg",
     isActive: true
   },
@@ -126,7 +125,6 @@ export const users = [
     batch: "2024-2028",
     committee: "Event Management",
     designation: "President",
-    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/dhruvi.jpg",
     isActive: true
   },
@@ -144,7 +142,6 @@ export const users = [
     batch: "2023-2027",
     committee: "Logistics",
     designation: "Operations Lead",
-    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
