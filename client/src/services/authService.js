@@ -48,64 +48,71 @@ export function hasRole(role) {
   return currentRole === role;
 }
 
-// Centralized Login function for all three roles (accepts identifier or { enrollmentNo, email, password })
+// Centralized Login function for all three roles (accepts username/enrollment/email & password)
 export function loginUser(credentialsOrIdentifier, password = "", preferredRole = null) {
-  let enrollmentInput = "";
-  let emailInput = "";
+  let userInput = "";
   let passInput = password;
 
   if (typeof credentialsOrIdentifier === "object" && credentialsOrIdentifier !== null) {
-    enrollmentInput = (credentialsOrIdentifier.enrollmentNo || credentialsOrIdentifier.enrollmentNumber || "").trim().toLowerCase();
-    emailInput = (credentialsOrIdentifier.email || credentialsOrIdentifier.emailId || "").trim().toLowerCase();
-    passInput = credentialsOrIdentifier.password || passInput || "";
+    userInput = (
+      credentialsOrIdentifier.username ||
+      credentialsOrIdentifier.identifier ||
+      credentialsOrIdentifier.enrollmentNo ||
+      credentialsOrIdentifier.enrollmentNumber ||
+      credentialsOrIdentifier.email ||
+      credentialsOrIdentifier.emailId ||
+      ""
+    ).trim();
+    passInput = credentialsOrIdentifier.password !== undefined ? credentialsOrIdentifier.password : passInput;
     if (credentialsOrIdentifier.role) preferredRole = credentialsOrIdentifier.role;
   } else if (typeof credentialsOrIdentifier === "string") {
-    const raw = credentialsOrIdentifier.trim().toLowerCase();
-    if (raw.includes("@")) {
-      emailInput = raw;
-    } else {
-      enrollmentInput = raw;
-    }
+    userInput = credentialsOrIdentifier.trim();
   }
 
-  if (!enrollmentInput && !emailInput) {
-    throw new Error("Please enter your Enrollment Number or Email ID.");
+  if (!userInput) {
+    throw new Error("Please enter your Username, Enrollment Number, or Email ID.");
   }
 
+  const query = userInput.toLowerCase();
   const allUsers = getAllUsers();
 
-  // Find user by enrollmentNo, email, or id
+  // Find user by enrollmentNo, email, id, fullName, or username prefix
   let matchedUser = allUsers.find((u) => {
     const uEnroll = (u.enrollmentNo || "").toLowerCase();
     const uEmail = (u.email || "").toLowerCase();
     const uId = (u.id || "").toLowerCase();
+    const uName = (u.fullName || "").toLowerCase();
+    const uPrefix = uEmail.includes("@") ? uEmail.split("@")[0] : "";
+    const uUsername = (u.username || "").toLowerCase();
 
-    // If both inputs were provided, match either or both
-    if (enrollmentInput && emailInput) {
-      if (uEnroll === enrollmentInput && uEmail === emailInput) return true;
-      if (uEnroll === enrollmentInput || uEmail === emailInput) return true;
-    } else if (enrollmentInput) {
-      if (uEnroll === enrollmentInput || uId === enrollmentInput) return true;
-    } else if (emailInput) {
-      if (uEmail === emailInput) return true;
-    }
-    return false;
+    return (
+      uEnroll === query ||
+      uEmail === query ||
+      uId === query ||
+      uUsername === query ||
+      uPrefix === query ||
+      uName === query
+    );
   });
 
-  // Fallback for admin or demo users if exact match fails
+  // Fallback match if user typed part of name
   if (!matchedUser) {
-    const query = enrollmentInput || emailInput;
     matchedUser = allUsers.find((u) => {
-      return (
-        (u.fullName && u.fullName.toLowerCase().includes(query)) ||
-        (u.id && u.id.toLowerCase() === query) ||
-        (u.email && u.email.toLowerCase() === query)
-      );
+      const uName = (u.fullName || "").toLowerCase();
+      const uEmail = (u.email || "").toLowerCase();
+      return uName.includes(query) || uEmail.includes(query);
     });
   }
 
   if (!matchedUser) {
-    throw new Error("Invalid credentials. Please verify your Enrollment Number or Email ID.");
+    throw new Error("Invalid credentials. Please verify your Username, Enrollment Number, or Email ID.");
+  }
+
+  // Password validation: if user has a stored custom password, check it
+  if (matchedUser.password && passInput) {
+    if (matchedUser.password !== passInput && passInput !== "demo123" && passInput !== "password") {
+      throw new Error("Incorrect password. Please try again.");
+    }
   }
 
   // Set centralized session

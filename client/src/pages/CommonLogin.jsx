@@ -25,9 +25,10 @@ export default function CommonLogin() {
   // SIGN IN STATE
   // ==========================================
   const [signInData, setSignInData] = useState({
-    enrollmentNo: "",
-    email: "",
+    username: "",
+    password: "",
   });
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
 
   // ==========================================
   // REGISTER STATE
@@ -105,25 +106,26 @@ export default function CommonLogin() {
     setError("");
     setSuccessMsg("");
 
-    const enroll = signInData.enrollmentNo.trim();
-    const email = signInData.email.trim();
+    const username = signInData.username.trim();
+    const password = signInData.password;
 
-    // Frontend validation: at least one identifier must be provided
-    if (!enroll && !email) {
-      setError("Please enter your Enrollment Number or Email ID.");
+    // Frontend validation: username is required
+    if (!username) {
+      setError("Please enter your Username, Enrollment Number, or Email ID.");
       return;
     }
 
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      setError("Please enter a valid email address.");
+    // Frontend validation: password is required
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
 
     setLoading(true);
     try {
       const user = loginUser({
-        enrollmentNo: enroll,
-        email: email,
+        username,
+        password,
       });
       navigate(getDestinationPath(user.role));
     } catch (err) {
@@ -355,36 +357,46 @@ export default function CommonLogin() {
         {/* ======================================================== */}
         {activeTab === "signin" && (
           <form onSubmit={handleSignInSubmit} className="space-y-4">
-            {/* Enrollment Number */}
+            {/* Username */}
             <div>
               <label className="block text-xs font-semibold text-gray-800 mb-1.5">
-                Enrollment Number
+                Username
               </label>
               <input
                 type="text"
-                name="enrollmentNo"
-                value={signInData.enrollmentNo}
+                name="username"
+                value={signInData.username}
                 onChange={handleSignInChange}
-                placeholder="Enter your enrollment number"
+                placeholder="Enter your username"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7040d0] transition-colors"
               />
             </div>
 
-            {/* Email ID */}
+            {/* Password */}
             <div>
               <label className="block text-xs font-semibold text-gray-800 mb-1.5">
-                Email ID
+                Password
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
-                  type="email"
-                  name="email"
-                  value={signInData.email}
+                  type={showSignInPassword ? "text" : "password"}
+                  name="password"
+                  value={signInData.password}
                   onChange={handleSignInChange}
-                  placeholder="yourname@vgec.ac.in"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7040d0] transition-colors"
+                  placeholder="Enter your password"
+                  className="w-full pl-4 pr-10 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7040d0] transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowSignInPassword(!showSignInPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  {showSignInPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
