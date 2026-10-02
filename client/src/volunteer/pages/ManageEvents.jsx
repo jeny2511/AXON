@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -17,18 +17,105 @@ import {
   Image,
 } from "lucide-react";
 import { events as mockEvents } from "../../mockData";
+import api from "../../services/api.js";
+
+// Helper to normalize raw MongoDB Event objects into the exact structure ManageEvents expects
+function normalizeBackendEvent(ev) {
+  if (!ev) return null;
+  const id = ev._id || ev.id;
+  const name = ev.name || ev.title || "";
+  const speakerName = ev.speaker || ev.speakerName || "";
+
+  let eventDate = "";
+  if (ev.eventDate) {
+    eventDate = ev.eventDate.includes("T") ? ev.eventDate.split("T")[0] : ev.eventDate;
+  } else if (ev.date) {
+    try {
+      eventDate = new Date(ev.date).toISOString().split("T")[0];
+    } catch {
+      eventDate = String(ev.date);
+    }
+  }
+
+  let eventEndDate = eventDate;
+  if (ev.eventEndDate) {
+    eventEndDate = ev.eventEndDate.includes("T") ? ev.eventEndDate.split("T")[0] : ev.eventEndDate;
+  } else if (ev.endDate) {
+    try {
+      eventEndDate = new Date(ev.endDate).toISOString().split("T")[0];
+    } catch {
+      eventEndDate = String(ev.endDate);
+    }
+  }
+
+  let status = ev.status || "upcoming";
+  if (status === "published") {
+    const now = new Date();
+    const sDate = new Date(ev.date || ev.eventDate);
+    const eDate = ev.endDate || ev.eventEndDate ? new Date(ev.endDate || ev.eventEndDate) : sDate;
+    if (now > eDate && now.toDateString() !== eDate.toDateString()) {
+      status = "past";
+    } else if (now.toDateString() === sDate.toDateString() || (now >= sDate && now <= eDate)) {
+      status = "ongoing";
+    } else {
+      status = "upcoming";
+    }
+  }
+
+  let eligibleCombinations = ev.eligibleCombinations || [];
+  if ((!eligibleCombinations || eligibleCombinations.length === 0) && ev.eligibility) {
+    const years = ev.eligibility.years || ev.eligibleYears || [];
+    const depts = ev.eligibility.branchCodes || ev.eligibleDepartments || [];
+    if (years.length > 0 && depts.length > 0) {
+      eligibleCombinations = years.flatMap((yr) => {
+        const yrLabel = yr === 1 ? "1st Year" : yr === 2 ? "2nd Year" : yr === 3 ? "3rd Year" : "4th Year";
+        return depts.filter((d) => d !== "ALL").map((d) => `${yrLabel} ${d}`);
+      });
+    }
+  }
+
+  return {
+    ...ev,
+    id,
+    _id: id,
+    name,
+    speakerName,
+    eventDate,
+    eventEndDate,
+    startTime: ev.startTime || "10:00 AM",
+    endTime: ev.endTime || "01:00 PM",
+    venue: ev.venue || "",
+    category: ev.category || "Workshop",
+    description: ev.description || "",
+    registrationOpen: ev.registration?.openAt ? new Date(ev.registration.openAt).toISOString().slice(0, 16) : (ev.registrationOpen || ""),
+    registrationClose: ev.registration?.closeAt ? new Date(ev.registration.closeAt).toISOString().slice(0, 16) : (ev.registrationClose || ""),
+    attendanceOpen: ev.attendance?.openAt ? new Date(ev.attendance.openAt).toISOString().slice(0, 16) : (ev.attendanceOpen || ""),
+    attendanceClose: ev.attendance?.closeAt ? new Date(ev.attendance.closeAt).toISOString().slice(0, 16) : (ev.attendanceClose || ""),
+    participantLimit: Number(ev.participantsLimit || ev.participantLimit) || 100,
+    poster: ev.poster || "",
+    posterName: ev.posterName || (ev.poster ? "Attached Poster" : ""),
+    rulebook: ev.rulebook || (ev.rulebooks?.[0]?.url || ""),
+    eligibleCombinations,
+    eligibleYears: ev.eligibility?.years || ev.eligibleYears || [],
+    eligibleDepartments: ev.eligibility?.branchCodes || ev.eligibleDepartments || [],
+    status,
+    registrationStatus: ev.isRegistrationOpen ? "open" : (ev.registrationStatus || (status === "draft" ? "closed" : "open")),
+    registeredCount: ev.registeredCount || 0,
+    certificateAvailable: ev.certificateAvailable ?? true,
+    feedbackRequired: ev.feedbackRequired ?? true,
+  };
+}
 
 // ============================================================================
 // SERVICE LAYER (MVC ARCHITECTURE: FRONTEND SERVICE / API SIMULATOR)
-// In a full-stack MERN application, these functions will make real HTTP requests:
+// In a full-stack MERN application, these functions make real HTTP requests:
 // - getAll:   GET    /api/events
 // - create:   POST   /api/events
 // - update:   PUT    /api/events/:id
 // - delete:   DELETE /api/events/:id
-// Currently, it interacts with our shared mockData as our mock API.
 // ============================================================================
 const eventService = {
-  // Fetch all events from API/mockData
+  // Fetch all events synchronously from cache or mockData (prevents layout shift on mount)
   getAllEvents: () => {
     const cached = localStorage.getItem("axon_live_events");
     if (cached) {
@@ -38,6 +125,28 @@ const eventService = {
       } catch {}
     }
     return [...mockEvents];
+  },
+
+  // Fetch live events from Express backend /api/events
+  fetchLiveEvents: async () => {
+    try {
+      const res = await api.get("/events?limit=100");
+      if (res && Array.isArray(res.events)) {
+        const backendNormalized = res.events.map(normalizeBackendEvent).filter(Boolean);
+        if (backendNormalized.length > 0) {
+          const dbIds = new Set(backendNormalized.map((e) => String(e.id || e._id)));
+          const currentLocal = eventService.getAllEvents();
+          const retainedLocal = currentLocal.filter((e) => !dbIds.has(String(e.id || e._id)));
+          const merged = [...backendNormalized, ...retainedLocal];
+          localStorage.setItem("axon_live_events", JSON.stringify(merged));
+          window.dispatchEvent(new Event("axon-events-change"));
+          return merged;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch events from /api/events:", err?.message || err);
+    }
+    return null;
   },
 
   // Create a new event (supports 'upcoming' or 'draft' status)
@@ -57,13 +166,53 @@ const eventService = {
       localStorage.setItem("axon_live_events", JSON.stringify(updated));
       window.dispatchEvent(new Event("axon-events-change"));
     } catch {}
+
+    // Asynchronously sync with backend /api/events
+    const apiPayload = {
+      name: newEventData.name,
+      speaker: newEventData.speakerName,
+      date: newEventData.eventDate,
+      endDate: newEventData.eventEndDate || newEventData.eventDate,
+      startTime: newEventData.startTime,
+      endTime: newEventData.endTime,
+      venue: newEventData.venue,
+      category: newEventData.category,
+      description: newEventData.description,
+      participantsLimit: Number(newEventData.participantLimit) || 100,
+      poster: newEventData.poster || "",
+      registrationOpen: newEventData.registrationOpen,
+      registrationClose: newEventData.registrationClose,
+      attendanceOpen: newEventData.attendanceOpen,
+      attendanceClose: newEventData.attendanceClose,
+      eligibleDepartments: newEventData.eligibleDepartments || [],
+      eligibleYears: newEventData.eligibleYears || [],
+      rulebook: newEventData.rulebook || "",
+      status: targetStatus === "draft" ? "draft" : "published",
+    };
+
+    api.post("/events", apiPayload)
+      .then((res) => {
+        if (res && res.event && res.event._id) {
+          const liveNormalized = normalizeBackendEvent(res.event);
+          const currentList = eventService.getAllEvents();
+          const syncedList = currentList.map((ev) =>
+            ev.id === generatedId ? { ...liveNormalized, id: res.event._id } : ev
+          );
+          localStorage.setItem("axon_live_events", JSON.stringify(syncedList));
+          window.dispatchEvent(new Event("axon-events-change"));
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend /api/events POST fallback to local:", err?.message || err);
+      });
+
     return newEvent;
   },
 
   // Update an existing event by ID
   updateEvent: (eventId, updatedData, existingList) => {
     const updated = existingList.map((ev) =>
-      ev.id === eventId
+      ev.id === eventId || ev._id === eventId
         ? {
             ...ev,
             ...updatedData,
@@ -75,16 +224,59 @@ const eventService = {
       localStorage.setItem("axon_live_events", JSON.stringify(updated));
       window.dispatchEvent(new Event("axon-events-change"));
     } catch {}
+
+    // Asynchronously sync with backend /api/events/:id
+    const targetEvent = existingList.find((ev) => ev.id === eventId || ev._id === eventId);
+    const backendId = targetEvent?._id || eventId;
+
+    const apiPayload = {
+      name: updatedData.name,
+      speaker: updatedData.speakerName,
+      date: updatedData.eventDate,
+      endDate: updatedData.eventEndDate || updatedData.eventDate,
+      startTime: updatedData.startTime,
+      endTime: updatedData.endTime,
+      venue: updatedData.venue,
+      category: updatedData.category,
+      description: updatedData.description,
+      participantsLimit: Number(updatedData.participantLimit) || 100,
+      poster: updatedData.poster !== undefined ? updatedData.poster : targetEvent?.poster,
+      registrationOpen: updatedData.registrationOpen,
+      registrationClose: updatedData.registrationClose,
+      attendanceOpen: updatedData.attendanceOpen,
+      attendanceClose: updatedData.attendanceClose,
+      eligibleDepartments: updatedData.eligibleDepartments || [],
+      eligibleYears: updatedData.eligibleYears || [],
+      rulebook: updatedData.rulebook || "",
+      status: updatedData.status === "draft" ? "draft" : "published",
+    };
+
+    if (backendId) {
+      api.put(`/events/${backendId}`, apiPayload).catch((err) => {
+        console.warn("Backend /api/events PUT fallback to local:", err?.message || err);
+      });
+    }
+
     return updated;
   },
 
   // Remove an event by ID
   deleteEvent: (eventId, existingList) => {
-    const remaining = existingList.filter((ev) => ev.id !== eventId);
+    const remaining = existingList.filter((ev) => ev.id !== eventId && ev._id !== eventId);
     try {
       localStorage.setItem("axon_live_events", JSON.stringify(remaining));
       window.dispatchEvent(new Event("axon-events-change"));
     } catch {}
+
+    const targetEvent = existingList.find((ev) => ev.id === eventId || ev._id === eventId);
+    const backendId = targetEvent?._id || eventId;
+
+    if (backendId) {
+      api.delete(`/events/${backendId}`).catch((err) => {
+        console.warn("Backend /api/events DELETE fallback to local:", err?.message || err);
+      });
+    }
+
     return remaining;
   },
 };
@@ -197,6 +389,23 @@ function ManageEvents() {
 
   const [formData, setFormData] = useState(defaultFormData);
   const [formError, setFormError] = useState("");
+
+  // Live backend synchronization and cross-component reactive listener
+  useEffect(() => {
+    eventService.fetchLiveEvents().then((live) => {
+      if (live && live.length > 0) {
+        setEventList(live);
+      }
+    });
+
+    const handleSync = () => {
+      const current = eventService.getAllEvents();
+      setEventList(current);
+    };
+
+    window.addEventListener("axon-events-change", handleSync);
+    return () => window.removeEventListener("axon-events-change", handleSync);
+  }, []);
 
   // ----------------------------------------------------
   // COMPUTED DATA (useMemo for Performance & Efficiency)

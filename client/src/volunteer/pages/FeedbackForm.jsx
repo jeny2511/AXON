@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 
-import { events, feedbackForms } from "../../mockData";
+import { events as mockEvents, feedbackForms } from "../../mockData";
+import api from "../../services/api.js";
 
 const MAX_QUESTIONS = 15;
 const MIN_QUESTIONS = 5;
@@ -76,14 +77,26 @@ function FeedbackForm() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const allEventsList = useMemo(() => {
+    const cachedEvents = localStorage.getItem("axon_live_events");
+    let all = [...mockEvents];
+    if (cachedEvents) {
+      try {
+        const parsed = JSON.parse(cachedEvents);
+        if (Array.isArray(parsed) && parsed.length > 0) all = parsed;
+      } catch {}
+    }
+    return all;
+  }, []);
+
   // Default selection: Nearest event chronologically to now
   const nearestEvent = useMemo(() => {
-    return [...events].sort((a, b) => {
-      const aDate = new Date(`${a.eventDate}T${a.startTime}`).getTime();
-      const bDate = new Date(`${b.eventDate}T${b.startTime}`).getTime();
+    return [...allEventsList].sort((a, b) => {
+      const aDate = new Date(`${a.eventDate || a.date}T${a.startTime || "10:00 AM"}`).getTime();
+      const bDate = new Date(`${b.eventDate || b.date}T${b.startTime || "10:00 AM"}`).getTime();
       return Math.abs(aDate - Date.now()) - Math.abs(bDate - Date.now());
     })[0];
-  }, []);
+  }, [allEventsList]);
 
   useEffect(() => {
     if (nearestEvent && !selectedEvent) {
@@ -92,20 +105,47 @@ function FeedbackForm() {
     }
   }, [nearestEvent, selectedEvent]);
 
+  // Live fetch feedback form from backend API when selected event changes
+  useEffect(() => {
+    if (selectedEvent) {
+      const targetId = selectedEvent._id || selectedEvent.id;
+      api.get(`/feedback/form/${targetId}`)
+        .then((res) => {
+          if (res && res.form && Array.isArray(res.form.questions) && res.form.questions.length > 0) {
+            setForms((prev) => {
+              const exists = prev.some((item) => item.eventId === selectedEvent.id || item.eventId === selectedEvent._id);
+              const liveForm = {
+                eventId: selectedEvent.id,
+                included: true,
+                generated: true,
+                publishedAt: res.form.isActive ? (res.form.updatedAt || new Date().toISOString()) : null,
+                questions: res.form.questions,
+                responses: prev.find((item) => item.eventId === selectedEvent.id)?.responses || [],
+              };
+              return exists
+                ? prev.map((item) => (item.eventId === selectedEvent.id ? liveForm : item))
+                : [...prev, liveForm];
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedEvent]);
+
   // Dropdown list & live typeahead
   const filteredEvents = useMemo(() => {
     if (
       !search.trim() ||
       (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
     ) {
-      return events;
+      return allEventsList;
     }
-    return events.filter((event) =>
+    return allEventsList.filter((event) =>
       event.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search, selectedEvent]);
+  }, [search, selectedEvent, allEventsList]);
 
-  const form = forms.find((item) => item.eventId === selectedEvent?.id);
+  const form = forms.find((item) => item.eventId === selectedEvent?.id || item.eventId === selectedEvent?._id);
   const status = selectedEvent ? getStatus(selectedEvent) : "";
 
   // Edit lockout: Locked during last 15 minutes of ongoing event when already active
@@ -277,6 +317,18 @@ function FeedbackForm() {
         : [...items, updatedForm];
     });
 
+    // Sync form with live backend API
+    if (selectedEvent) {
+      const targetId = selectedEvent._id || selectedEvent.id;
+      api.post(`/feedback/form/${targetId}`, {
+        title: `${selectedEvent.name} - Feedback Form`,
+        questions: validQuestions,
+        isActive: Boolean(updatedForm.publishedAt),
+      }).catch((err) => {
+        console.warn("Feedback form live save notice:", err?.message || err);
+      });
+    }
+
     setModal(null);
     setToast(modal === "create" ? "Feedback form created successfully!" : "Form changes saved successfully!");
   }
@@ -292,6 +344,14 @@ function FeedbackForm() {
           : item
       )
     );
+
+    if (selectedEvent) {
+      const targetId = selectedEvent._id || selectedEvent.id;
+      api.post(`/feedback/form/${targetId}`, {
+        isActive: true,
+      }).catch(() => {});
+    }
+
     setToast("Feedback form published successfully.");
   }
 
@@ -306,6 +366,14 @@ function FeedbackForm() {
           : item
       )
     );
+
+    if (selectedEvent) {
+      const targetId = selectedEvent._id || selectedEvent.id;
+      api.post(`/feedback/form/${targetId}`, {
+        isActive: false,
+      }).catch(() => {});
+    }
+
     setToast("Feedback form unpublished and returned to draft.");
   }
 

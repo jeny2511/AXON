@@ -6,17 +6,22 @@ import {
     Search,
 } from "lucide-react";
 
-import { events, tasks as mockTasks } from "../../mockData";
+import { events as initialMockEvents, tasks as mockTasks } from "../../mockData";
+import { API_BASE_URL } from "../../services/api";
 
 function getEventStatus(event) {
     const now = new Date();
 
     const start = new Date(
-        `${event.eventDate}T${event.startTime}`
+        `${event.eventDate || event.date || ""}`.includes("T")
+            ? (event.eventDate || event.date)
+            : `${event.eventDate || event.date || ""}T${event.startTime || "09:00"}`
     );
 
     const end = new Date(
-        `${event.eventDate}T${event.endTime}`
+        `${event.eventDate || event.endDate || event.date || ""}`.includes("T")
+            ? (event.eventDate || event.endDate || event.date)
+            : `${event.eventDate || event.endDate || event.date || ""}T${event.endTime || "17:00"}`
     );
 
     if (now < start) return "upcoming";
@@ -26,7 +31,10 @@ function getEventStatus(event) {
 
 function formatDate(dateStr) {
     if (!dateStr) return "";
-    return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-IN", {
+    const str = `${dateStr}`.includes("T") ? dateStr : `${dateStr}T00:00:00`;
+    const d = new Date(str);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -34,6 +42,17 @@ function formatDate(dateStr) {
 }
 
 function Tasks() {
+    const [eventsList, setEventsList] = useState(() => {
+        try {
+            const saved = localStorage.getItem("axon_live_events");
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch {}
+        return initialMockEvents;
+    });
+
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [search, setSearch] = useState("");
     const [showEvents, setShowEvents] = useState(false);
@@ -41,6 +60,42 @@ function Tasks() {
 
     const [tasks, setTasks] = useState([]);
     const [saved, setSaved] = useState(false);
+
+    // Load live events
+    useEffect(() => {
+        const fetchEvents = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/events`);
+                const data = await res.json();
+                if (data.success && Array.isArray(data.events)) {
+                    const normalized = data.events.map((ev) => ({
+                        id: ev._id || ev.id,
+                        _id: ev._id || ev.id,
+                        name: ev.name,
+                        category: ev.category || "Workshop",
+                        eventDate: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+                        date: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+                        startTime: ev.startTime || "10:00",
+                        endTime: ev.endTime || "12:00",
+                        venue: ev.venue || "Campus Venue",
+                        status: ev.status || "upcoming",
+                        poster: ev.poster || null,
+                    }));
+                    setEventsList(normalized);
+                }
+            } catch {}
+        };
+        fetchEvents();
+
+        const handleEventsChange = () => {
+            try {
+                const saved = localStorage.getItem("axon_live_events");
+                if (saved) setEventsList(JSON.parse(saved));
+            } catch {}
+        };
+        window.addEventListener("axon-events-change", handleEventsChange);
+        return () => window.removeEventListener("axon-events-change", handleEventsChange);
+    }, []);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -54,13 +109,13 @@ function Tasks() {
     }, []);
 
     const nearestEvent = useMemo(() => {
-        return [...events].sort((a, b) => {
+        return [...eventsList].sort((a, b) => {
             const aTime = new Date(
-                `${a.eventDate}T${a.startTime}`
+                `${a.eventDate || a.date}T${a.startTime || "09:00"}`
             ).getTime();
 
             const bTime = new Date(
-                `${b.eventDate}T${b.startTime}`
+                `${b.eventDate || b.date}T${b.startTime || "09:00"}`
             ).getTime();
 
             return (
@@ -68,7 +123,7 @@ function Tasks() {
                 Math.abs(bTime - Date.now())
             );
         })[0];
-    }, []);
+    }, [eventsList]);
 
     useEffect(() => {
         if (!selectedEvent && nearestEvent) {
@@ -79,10 +134,31 @@ function Tasks() {
 
     useEffect(() => {
         if (selectedEvent) {
-            const eventTasks = mockTasks.filter(
-                (task) => task.eventId === selectedEvent.id
-            );
-            setTasks(eventTasks);
+            let loadedTasks = [];
+            try {
+                const stored = localStorage.getItem("axon_volunteer_tasks");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed[selectedEvent.id]) {
+                        loadedTasks = parsed[selectedEvent.id];
+                    }
+                }
+            } catch {}
+
+            if (!loadedTasks || loadedTasks.length === 0) {
+                loadedTasks = mockTasks.filter(
+                    (task) => task.eventId === selectedEvent.id || task.eventId === selectedEvent._id
+                );
+                if (loadedTasks.length === 0) {
+                    loadedTasks = [
+                        { id: `TSK_${selectedEvent.id}_1`, eventId: selectedEvent.id, title: "Coordinate with Venue Manager", completed: false },
+                        { id: `TSK_${selectedEvent.id}_2`, eventId: selectedEvent.id, title: "Set up Audio/Visual system", completed: false },
+                        { id: `TSK_${selectedEvent.id}_3`, eventId: selectedEvent.id, title: "Verify participant registration passes", completed: false },
+                        { id: `TSK_${selectedEvent.id}_4`, eventId: selectedEvent.id, title: "Distribute certificates and take feedback", completed: false },
+                    ];
+                }
+            }
+            setTasks(loadedTasks);
             setSaved(false);
         }
     }, [selectedEvent]);
@@ -92,12 +168,12 @@ function Tasks() {
             !search.trim() ||
             (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
         ) {
-            return events;
+            return eventsList;
         }
-        return events.filter((event) =>
+        return eventsList.filter((event) =>
             event.name.toLowerCase().includes(search.toLowerCase())
         );
-    }, [search, selectedEvent]);
+    }, [eventsList, search, selectedEvent]);
 
     function toggleTask(taskId) {
         setTasks((current) =>
@@ -112,6 +188,14 @@ function Tasks() {
     }
 
     function saveChanges() {
+        if (selectedEvent) {
+            try {
+                const stored = localStorage.getItem("axon_volunteer_tasks");
+                const parsed = stored ? JSON.parse(stored) : {};
+                parsed[selectedEvent.id] = tasks;
+                localStorage.setItem("axon_volunteer_tasks", JSON.stringify(parsed));
+            } catch {}
+        }
         setSaved(true);
     }
 

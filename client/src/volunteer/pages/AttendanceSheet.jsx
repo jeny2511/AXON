@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { events as mockEvents } from "../../mockData";
+import api from "../../services/api.js";
 
 // ============================================================================
 // HELPER FUNCTIONS & SHARED STORAGE UTILITIES
@@ -184,11 +185,51 @@ export default function AttendanceSheet() {
 
   // Find target event by ID or fallback to first event
   const currentEvent = useMemo(() => {
-    return mockEvents.find((e) => e.id === eventId) || mockEvents[0];
+    const cachedEvents = localStorage.getItem("axon_live_events");
+    let allEvents = [...mockEvents];
+    if (cachedEvents) {
+      try {
+        const parsed = JSON.parse(cachedEvents);
+        if (Array.isArray(parsed) && parsed.length > 0) allEvents = parsed;
+      } catch {}
+    }
+    return allEvents.find((e) => e.id === eventId || e._id === eventId) || allEvents[0];
   }, [eventId]);
 
   const isAttendanceOpen = useMemo(() => {
     return getEventWindowStatus(currentEvent);
+  }, [currentEvent]);
+
+  // Live fetch participants from backend API
+  useEffect(() => {
+    if (currentEvent) {
+      const targetId = currentEvent._id || currentEvent.id;
+      api.get(`/registrations/event/${targetId}/participants`)
+        .then((res) => {
+          if (res && res.success && Array.isArray(res.participants) && res.participants.length > 0) {
+            const mapped = res.participants.map((p) => {
+              const isPresent = p.attendanceStatus === "present" || p.hasAttended;
+              return {
+                id: p.registrationId || `REG-${currentEvent.id}-${p.enrollmentNo || p.enrollmentNumber}`,
+                eventId: currentEvent.id,
+                enrollmentNo: p.enrollmentNo || p.enrollmentNumber,
+                name: p.name || p.fullName,
+                department: p.department || "IT",
+                year: p.batch ? `${p.batch} Batch` : (p.year || "3rd Year"),
+                semester: p.semester || 5,
+                status: isPresent ? "present" : "absent",
+                checkInTime: isPresent ? "10:15 AM" : null,
+                qrCode: p.qrCode || `QR-${currentEvent.id}-${p.enrollmentNo || p.enrollmentNumber}`,
+              };
+            });
+            setParticipants(mapped);
+            try {
+              localStorage.setItem(getStorageKey(currentEvent.id), JSON.stringify(mapped));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
   }, [currentEvent]);
 
   // Load participants from localStorage or synthesize default roster for this specific event
@@ -342,6 +383,20 @@ export default function AttendanceSheet() {
         return p;
       })
     );
+
+    if (currentEvent) {
+      const student = participants.find((p) => p.enrollmentNo === enrollmentNo);
+      const isCurrentlyPresent = student?.status === "present";
+      if (!isCurrentlyPresent) {
+        api.post("/attendance/manual", {
+          eventId: currentEvent._id || currentEvent.id,
+          enrollmentNumber: enrollmentNo,
+          reason: "Manual attendance toggle in Attendance Sheet",
+        }).catch((err) => {
+          console.warn("Live attendance sync notice:", err?.message || err);
+        });
+      }
+    }
   };
 
   // Mark Present manually
@@ -388,6 +443,16 @@ export default function AttendanceSheet() {
           : p
       )
     );
+
+    if (currentEvent) {
+      api.post("/attendance/manual", {
+        eventId: currentEvent._id || currentEvent.id,
+        enrollmentNumber: targetStudent.enrollmentNo,
+        reason: "Manual check-in modal in Attendance Sheet",
+      }).catch((err) => {
+        console.warn("Live attendance sync notice:", err?.message || err);
+      });
+    }
 
     setFeedbackNotice({
       type: "success",

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Bell,
   Calendar,
@@ -12,10 +12,11 @@ import {
 } from "lucide-react";
 import { notifications as initialNotifications } from "../../mockData/notifications";
 import { getAuthUser } from "../../services/authService";
+import { API_BASE_URL } from "../../services/api";
 
 function Notifications() {
   const currentVolunteer = getAuthUser();
-  const volunteerId = currentVolunteer?.id || currentVolunteer?.userId || "VL001";
+  const volunteerId = currentVolunteer?.id || currentVolunteer?._id || currentVolunteer?.userId || "VL001";
 
   const [notificationsList, setNotificationsList] = useState(() => {
     const saved = localStorage.getItem(`axon_notifications_${volunteerId}`);
@@ -35,6 +36,34 @@ function Notifications() {
 
   const [filter, setFilter] = useState("all");
 
+  useEffect(() => {
+    const fetchNotifs = async () => {
+      try {
+        const token = localStorage.getItem("axon_token");
+        if (!token) return;
+        const res = await fetch(`${API_BASE_URL}/notifications`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.notifications) && data.notifications.length > 0) {
+          const normalized = data.notifications.map((n) => ({
+            notificationId: n._id || n.id,
+            id: n._id || n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type || "info",
+            isRead: n.isRead || false,
+            createdAt: n.createdAt,
+            eventId: n.referenceId || n.eventId,
+          }));
+          setNotificationsList(normalized);
+          localStorage.setItem(`axon_notifications_${volunteerId}`, JSON.stringify(normalized));
+        }
+      } catch {}
+    };
+    fetchNotifs();
+  }, [volunteerId]);
+
   const saveNotifications = (newList) => {
     setNotificationsList(newList);
     localStorage.setItem(
@@ -43,14 +72,34 @@ function Notifications() {
     );
   };
 
-  const markAsRead = (notificationId) => {
+  const markAsRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem("axon_token");
+      if (token) {
+        await fetch(`${API_BASE_URL}/notifications/${notificationId}/read`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch {}
+
     const updated = notificationsList.map((n) =>
-      n.notificationId === notificationId ? { ...n, isRead: true } : n
+      (n.notificationId === notificationId || n.id === notificationId) ? { ...n, isRead: true } : n
     );
     saveNotifications(updated);
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem("axon_token");
+      if (token) {
+        await fetch(`${API_BASE_URL}/notifications/mark-all-read`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch {}
+
     const updated = notificationsList.map((n) => ({ ...n, isRead: true }));
     saveNotifications(updated);
   };

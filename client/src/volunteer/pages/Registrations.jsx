@@ -37,6 +37,7 @@ import {
   registrations as mockRegistrations,
   attendance as mockAttendance,
 } from "../../mockData";
+import api from "../../services/api.js";
 
 // ============================================================================
 // SERVICE LAYER (MVC ARCHITECTURE: FRONTEND SERVICE / API SIMULATOR)
@@ -265,14 +266,54 @@ const EVENT_REGISTERED_STUDENTS_MAP = {
 const registrationService = {
   // Returns all events sorted to prioritize upcoming / ongoing events
   getAllEvents: () => {
-    return [...mockEvents].sort((a, b) => {
+    let sourceEvents = [...mockEvents];
+    const cached = localStorage.getItem("axon_live_events");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          sourceEvents = parsed;
+        }
+      } catch {}
+    }
+
+    return sourceEvents.sort((a, b) => {
       // Prioritize upcoming or ongoing events first
       const statusOrder = { ongoing: 0, upcoming: 1, draft: 2, past: 3, completed: 3 };
       const rankA = statusOrder[a.status] ?? 4;
       const rankB = statusOrder[b.status] ?? 4;
       if (rankA !== rankB) return rankA - rankB;
-      return new Date(a.eventDate) - new Date(b.eventDate);
+      return new Date(a.eventDate || a.date) - new Date(b.eventDate || b.date);
     });
+  },
+
+  // Asynchronously fetch live registered participants from backend API
+  fetchParticipants: async (event) => {
+    if (!event) return null;
+    const targetId = event._id || event.id;
+    try {
+      const res = await api.get(`/registrations/event/${targetId}/participants`);
+      if (res && res.success && Array.isArray(res.participants) && res.participants.length > 0) {
+        return res.participants.map((p) => {
+          const isPresent = p.attendanceStatus === "present" || p.hasAttended;
+          return {
+            id: p.registrationId || `REG-${event.id}-${p.enrollmentNo || p.enrollmentNumber}`,
+            eventId: event.id,
+            enrollmentNo: p.enrollmentNo || p.enrollmentNumber,
+            name: p.name || p.fullName,
+            department: p.department || "IT",
+            year: p.batch ? `${p.batch} Batch` : (p.year || "3rd Year"),
+            semester: p.semester || 5,
+            status: isPresent ? "present" : "absent",
+            checkInTime: isPresent ? "10:15 AM" : null,
+            qrCode: p.qrCode || `QR-${event.id}-${p.enrollmentNo || p.enrollmentNumber}`,
+          };
+        });
+      }
+    } catch (err) {
+      // Fallback cleanly to local participants
+    }
+    return null;
   },
 
   // Generates or fetches participant roster specifically registered for this event
@@ -335,7 +376,16 @@ export default function Registrations() {
   // ----------------------------------------------------
 
   // Master list of all available events (upcoming, ongoing, past)
-  const [eventsList] = useState(() => registrationService.getAllEvents());
+  const [eventsList, setEventsList] = useState(() => registrationService.getAllEvents());
+
+  // Listen for event updates (e.g. newly created events in Manage Events)
+  useEffect(() => {
+    const handleSync = () => {
+      setEventsList(registrationService.getAllEvents());
+    };
+    window.addEventListener("axon-events-change", handleSync);
+    return () => window.removeEventListener("axon-events-change", handleSync);
+  }, []);
 
   // Nearest event (first upcoming/ongoing event) selected by default
   const nearestEvent = useMemo(() => {
@@ -401,18 +451,28 @@ export default function Registrations() {
       if (stored) {
         try {
           setParticipants(JSON.parse(stored));
-          return;
         } catch (e) {
           console.error("Error parsing stored participants:", e);
         }
+      } else {
+        const initialRoster = registrationService.getParticipantsForEvent(selectedEvent);
+        setParticipants(initialRoster);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(initialRoster));
+        } catch (e) {
+          console.error("Error writing initial participants to localStorage:", e);
+        }
       }
-      const initialRoster = registrationService.getParticipantsForEvent(selectedEvent);
-      setParticipants(initialRoster);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(initialRoster));
-      } catch (e) {
-        console.error("Error writing initial participants to localStorage:", e);
-      }
+
+      // Live fetch participants from backend API
+      registrationService.fetchParticipants(selectedEvent).then((liveRoster) => {
+        if (liveRoster && liveRoster.length > 0) {
+          setParticipants(liveRoster);
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(liveRoster));
+          } catch {}
+        }
+      });
     }
   }, [selectedEvent]);
 
@@ -550,6 +610,20 @@ export default function Registrations() {
         return p;
       })
     );
+
+    if (selectedEvent) {
+      const student = participants.find((p) => p.enrollmentNo === enrollmentNo);
+      const isCurrentlyPresent = student?.status === "present";
+      if (!isCurrentlyPresent) {
+        api.post("/attendance/manual", {
+          eventId: selectedEvent._id || selectedEvent.id,
+          enrollmentNumber: enrollmentNo,
+          reason: "Manual attendance toggle by volunteer",
+        }).catch((err) => {
+          console.warn("Live attendance sync notice:", err?.message || err);
+        });
+      }
+    }
   };
 
   // Audio synthesizer feedback (Web Audio API - crisp hardware scanner chime)
@@ -740,6 +814,22 @@ export default function Registrations() {
       },
       ...prev.slice(0, 9),
     ]);
+
+    // Asynchronously record live attendance in MongoDB backend
+    if (selectedEvent) {
+      api.post("/attendance/scan", {
+        token: rawQRString,
+        eventId: selectedEvent._id || selectedEvent.id,
+      }).catch(() => {
+        api.post("/attendance/manual", {
+          eventId: selectedEvent._id || selectedEvent.id,
+          enrollmentNumber: enrollment,
+          reason: "QR Code Scan Check-in",
+        }).catch((err) => {
+          console.warn("Live QR attendance sync notice:", err?.message || err);
+        });
+      });
+    }
 
     return true;
   };

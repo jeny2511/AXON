@@ -1,3 +1,4 @@
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays,
@@ -9,7 +10,7 @@ import {
   Clock,
   Calendar,
 } from "lucide-react";
-import { events, users, registrations, attendances } from "../../mockData";
+import { events as mockEvents, users as mockUsers, registrations as mockRegistrations, attendances as mockAttendances } from "../../mockData";
 
 const quickAccessItems = [
   {
@@ -39,15 +40,40 @@ const quickAccessItems = [
 ];
 
 function Dashboard() {
-  const totalEventsCount = events.length;
-  const upcomingEventsCount = events.filter((e) => e.status === "upcoming").length;
-  const totalVolunteersCount = users.filter((u) => u.role === "volunteer").length;
-  const totalStudentsCount = users.filter((u) => u.role === "student").length;
-  const totalRegistrationsCount = registrations.filter((r) => r.status === "registered").length;
+  const [liveEvents, setLiveEvents] = useState(() => {
+    const cached = localStorage.getItem("axon_live_events");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return mockEvents;
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      const cached = localStorage.getItem("axon_live_events");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) setLiveEvents(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener("axon-events-change", handleSync);
+    return () => window.removeEventListener("axon-events-change", handleSync);
+  }, []);
+
+  const totalEventsCount = liveEvents.length;
+  const upcomingEventsCount = liveEvents.filter((e) => e.status === "upcoming").length;
+  const totalVolunteersCount = mockUsers.filter((u) => u.role === "volunteer").length;
+  const totalStudentsCount = mockUsers.filter((u) => u.role === "student").length;
+  const totalRegistrationsCount = mockRegistrations.filter((r) => r.status === "registered").length;
 
   const avgAttendancePercent =
     totalRegistrationsCount > 0
-      ? Math.round((attendances.length / totalRegistrationsCount) * 100)
+      ? Math.round((mockAttendances.length / totalRegistrationsCount) * 100)
       : 85;
 
   const stats = [
@@ -72,36 +98,38 @@ function Dashboard() {
     {
       title: "Attendance Rate",
       value: `${avgAttendancePercent}%`,
-      subtext: `${attendances.length} verified attendances`,
+      subtext: `${mockAttendances.length} verified attendances`,
       icon: ClipboardCheck,
     },
   ];
 
-  const upcomingList = events
-    .filter((e) => e.status === "upcoming")
-    .slice(0, 4)
-    .map((event) => {
-      const eventRegCount = registrations.filter(
-        (r) => r.eventId === event.id && r.status === "registered"
-      ).length;
+  const upcomingList = useMemo(() => {
+    return liveEvents
+      .filter((e) => e.status === "upcoming")
+      .slice(0, 4)
+      .map((event) => {
+        const eventRegCount = mockRegistrations.filter(
+          (r) => r.eventId === event.id && r.status === "registered"
+        ).length;
 
-      const dateDisplay = event.eventDate
-        ? new Date(`${event.eventDate}T00:00:00`).toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-        : "TBD";
+        const dateDisplay = event.eventDate || event.date
+          ? new Date(`${(event.eventDate || event.date).includes("T") ? event.eventDate || event.date : (event.eventDate || event.date) + "T00:00:00"}`).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "TBD";
 
-      return {
-        id: event.id,
-        title: event.eventName,
-        date: dateDisplay,
-        time: event.startTime ? `${event.startTime} - ${event.endTime}` : "10:00 AM",
-        registered: eventRegCount,
-        status: "Upcoming",
-      };
-    });
+        return {
+          id: event.id || event._id,
+          title: event.name || event.eventName || "Event",
+          date: dateDisplay,
+          time: event.startTime ? `${event.startTime} - ${event.endTime}` : "10:00 AM",
+          registered: event.registeredCount || eventRegCount,
+          status: "Upcoming",
+        };
+      });
+  }, [liveEvents]);
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Award,
   BookOpen,
@@ -15,18 +15,56 @@ import {
 } from "lucide-react";
 
 import { users } from "../../mockData";
+import api from "../../services/api.js";
 
 function Profile() {
+  const [liveProfile, setLiveProfile] = useState(null);
+
+  useEffect(() => {
+    api.get("/users/profile")
+      .then((res) => {
+        if (res && res.user) {
+          setLiveProfile(res.user);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Current active volunteer user
   const currentVolunteer = useMemo(() => {
+    if (liveProfile) {
+      return {
+        id: liveProfile._id || liveProfile.id,
+        fullName: liveProfile.fullName || "Volunteer",
+        enrollmentNo: liveProfile.enrollmentNumber || liveProfile.enrollmentNo || "220130107000",
+        email: liveProfile.email || "volunteer@vgec.ac.in",
+        phone: liveProfile.phoneNumber || liveProfile.phone || "9876543210",
+        department: liveProfile.department || "IT",
+        year: liveProfile.batch ? 3 : 3,
+        semester: 5,
+        designation: liveProfile.role === "volunteer" ? "Volunteer Coordinator" : "President",
+        isActive: liveProfile.accountStatus !== "suspended",
+      };
+    }
+
     try {
-      const stored = localStorage.getItem("axon_volunteer_user");
+      const stored = localStorage.getItem("axon_auth_user") || localStorage.getItem("axon_volunteer_user");
       if (stored) {
         const parsed = JSON.parse(stored);
-        const match = users.find(
-          (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
-        );
-        if (match) return match;
+        if (parsed && (parsed.role === "volunteer" || parsed.email?.includes("vgec.ac.in"))) {
+          return {
+            id: parsed.id || parsed._id || "VL002",
+            fullName: parsed.fullName || parsed.name || "Volunteer",
+            enrollmentNo: parsed.enrollmentNumber || parsed.enrollmentNo || "220130108002",
+            email: parsed.email || "volunteer@vgec.ac.in",
+            phone: parsed.phoneNumber || parsed.phone || "9876543221",
+            department: parsed.department || "IT",
+            year: 3,
+            semester: 5,
+            designation: "Volunteer Coordinator",
+            isActive: true,
+          };
+        }
       }
     } catch (e) {}
 
@@ -34,9 +72,9 @@ function Profile() {
       users.find((u) => u.id === "VL002") ||
       users.find((u) => u.role === "volunteer") || {
         id: "VL002",
-        fullName: "Dhruvi Patel",
+        fullName: "Preyas Shah",
         enrollmentNo: "220130108002",
-        email: "dhruvi@vgec.ac.in",
+        email: "preyas@vgec.ac.in",
         phone: "9876543221",
         department: "IT",
         year: 3,
@@ -45,10 +83,10 @@ function Profile() {
         isActive: true,
       }
     );
-  }, []);
+  }, [liveProfile]);
 
   // Admin-assigned designation (e.g., President, Vice President)
-  const volunteerRoleTitle = currentVolunteer.designation || "President";
+  const volunteerRoleTitle = currentVolunteer.designation || "Volunteer Coordinator";
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

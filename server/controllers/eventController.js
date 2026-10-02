@@ -33,6 +33,8 @@ export const createEvent = async (req, res) => {
       registrationOpen,
       registrationClose,
       attendance,
+      attendanceOpen,
+      attendanceClose,
       eligibility,
       eligibleDepartments,
       eligibleYears,
@@ -106,9 +108,11 @@ export const createEvent = async (req, res) => {
     };
 
     // Parse Attendance Window (default to event date and times)
+    const attOpen = attendance?.openAt || attendanceOpen || startDate;
+    const attClose = attendance?.closeAt || attendanceClose || finalEndDate || startDate;
     const attWindow = {
-      openAt: attendance?.openAt ? new Date(attendance.openAt) : new Date(startDate),
-      closeAt: attendance?.closeAt ? new Date(attendance.closeAt) : (finalEndDate ? new Date(finalEndDate) : new Date(startDate)),
+      openAt: new Date(attOpen),
+      closeAt: new Date(attClose),
     };
 
     // Parse Eligibility

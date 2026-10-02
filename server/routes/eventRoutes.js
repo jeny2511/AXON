@@ -77,7 +77,7 @@ router.put("/:id", protect, isVolunteerOrAdmin, updateEvent);
  * @desc    Soft-delete event
  * @access  Admin Only
  */
-router.delete("/:id", protect, isAdmin, deleteEvent);
+router.delete("/:id", protect, isVolunteerOrAdmin, deleteEvent);
 
 /**
  * @route   POST /api/events/:id/reopen

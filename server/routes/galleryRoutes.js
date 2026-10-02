@@ -50,9 +50,9 @@ router.post("/:id/photos", protect, isVolunteerOrAdmin, addPhotosToAlbum);
 /**
  * @route   DELETE /api/gallery/:id
  * @desc    Soft-delete a gallery album
- * @access  Protected (Admin Only)
+ * @access  Protected (Volunteer & Admin)
  */
-router.delete("/:id", protect, isAdmin, deleteGalleryAlbum);
+router.delete("/:id", protect, isVolunteerOrAdmin, deleteGalleryAlbum);
 
 export default router;
 

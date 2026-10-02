@@ -5,6 +5,7 @@
  */
 
 const BASE_URL = "/api";
+export const API_BASE_URL = BASE_URL;
 const TOKEN_KEY = "axon_token";
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);

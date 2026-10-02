@@ -11,11 +11,12 @@ import {
 
 import {
     attendance,
-    events,
+    events as initialMockEvents,
     feedback,
     registrations,
     users,
 } from "../../mockData";
+import { API_BASE_URL } from "../../services/api";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -23,11 +24,15 @@ function getEventStatus(event) {
     const now = new Date();
 
     const start = new Date(
-        `${event.eventDate}T${event.startTime}`
+        `${event.eventDate || event.date || ""}`.includes("T")
+            ? (event.eventDate || event.date)
+            : `${event.eventDate || event.date || ""}T${event.startTime || "09:00"}`
     );
 
     const end = new Date(
-        `${event.eventDate}T${event.endTime}`
+        `${event.eventDate || event.endDate || event.date || ""}`.includes("T")
+            ? (event.eventDate || event.endDate || event.date)
+            : `${event.eventDate || event.endDate || event.date || ""}T${event.endTime || "17:00"}`
     );
 
     if (now < start) return "upcoming";
@@ -36,7 +41,11 @@ function getEventStatus(event) {
 }
 
 function formatDate(date) {
-    return new Date(`${date}T00:00:00`).toLocaleDateString(
+    if (!date) return "";
+    const dateStr = `${date}`.includes("T") ? date : `${date}T00:00:00`;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return date;
+    return d.toLocaleDateString(
         "en-IN",
         {
             day: "numeric",
@@ -47,18 +56,80 @@ function formatDate(date) {
 }
 
 function Certificates() {
+    const [eventsList, setEventsList] = useState(() => {
+        try {
+            const saved = localStorage.getItem("axon_live_events");
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch {}
+        return initialMockEvents;
+    });
+
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [search, setSearch] = useState("");
     const [showEvents, setShowEvents] = useState(false);
     const searchRef = useRef(null);
 
-    const [templates, setTemplates] = useState({});
-    const [generated, setGenerated] = useState({});
+    const [templates, setTemplates] = useState(() => {
+        try {
+            const saved = localStorage.getItem("axon_certificate_templates");
+            if (saved) return JSON.parse(saved);
+        } catch {}
+        return {};
+    });
+    const [generated, setGenerated] = useState(() => {
+        try {
+            const saved = localStorage.getItem("axon_generated_certificates");
+            if (saved) return JSON.parse(saved);
+        } catch {}
+        return {};
+    });
     const [eligibility, setEligibility] = useState("attendance");
 
     const [showGenerate, setShowGenerate] = useState(false);
     const [showTemplate, setShowTemplate] = useState(false);
     const [toast, setToast] = useState("");
+
+    // Load live events from API
+    useEffect(() => {
+        const fetchEvents = async () => {
+            try {
+                const res = await fetch(`${API_BASE_URL}/events`);
+                const data = await res.json();
+                if (data.success && Array.isArray(data.events)) {
+                    const normalized = data.events.map((ev) => ({
+                        id: ev._id || ev.id,
+                        _id: ev._id || ev.id,
+                        name: ev.name,
+                        category: ev.category || "Workshop",
+                        eventDate: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+                        date: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+                        startTime: ev.startTime || "10:00",
+                        endTime: ev.endTime || "12:00",
+                        venue: ev.venue || "Campus Venue",
+                        status: ev.status || "upcoming",
+                        certificateAvailable: ev.certificateAvailable !== false,
+                        feedbackRequired: ev.feedbackRequired !== false,
+                        poster: ev.poster || null,
+                    }));
+                    setEventsList(normalized);
+                    localStorage.setItem("axon_live_events", JSON.stringify(normalized));
+                }
+            } catch {}
+        };
+        fetchEvents();
+
+        const handleEventsChange = () => {
+            try {
+                const saved = localStorage.getItem("axon_live_events");
+                if (saved) setEventsList(JSON.parse(saved));
+            } catch {}
+        };
+        window.addEventListener("axon-events-change", handleEventsChange);
+        return () => window.removeEventListener("axon-events-change", handleEventsChange);
+    }, []);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -72,13 +143,13 @@ function Certificates() {
     }, []);
 
     const nearestEvent = useMemo(() => {
-        return [...events].sort((a, b) => {
+        return [...eventsList].sort((a, b) => {
             const aDate = new Date(
-                `${a.eventDate}T${a.startTime}`
+                `${a.eventDate || a.date}T${a.startTime || "09:00"}`
             ).getTime();
 
             const bDate = new Date(
-                `${b.eventDate}T${b.startTime}`
+                `${b.eventDate || b.date}T${b.startTime || "09:00"}`
             ).getTime();
 
             return (
@@ -86,7 +157,7 @@ function Certificates() {
                 Math.abs(bDate - Date.now())
             );
         })[0];
-    }, []);
+    }, [eventsList]);
 
     useEffect(() => {
         if (!selectedEvent && nearestEvent) {
@@ -94,6 +165,31 @@ function Certificates() {
             setSearch(nearestEvent.name);
         }
     }, [nearestEvent, selectedEvent]);
+
+    // Load event certificates when event is selected
+    useEffect(() => {
+        if (!selectedEvent) return;
+        const fetchIssued = async () => {
+            try {
+                const token = localStorage.getItem("axon_token");
+                const res = await fetch(`${API_BASE_URL}/certificates/event/${selectedEvent.id || selectedEvent._id}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                const data = await res.json();
+                if (data.success && Array.isArray(data.certificates)) {
+                    const ids = data.certificates.map(c => c.studentId?._id || c.studentId || c._id);
+                    if (ids.length > 0) {
+                        setGenerated(prev => {
+                            const updated = { ...prev, [selectedEvent.id]: ids };
+                            localStorage.setItem("axon_generated_certificates", JSON.stringify(updated));
+                            return updated;
+                        });
+                    }
+                }
+            } catch {}
+        };
+        fetchIssued();
+    }, [selectedEvent]);
 
     useEffect(() => {
         if (!toast) return;
@@ -107,12 +203,12 @@ function Certificates() {
             !search.trim() ||
             (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
         ) {
-            return events;
+            return eventsList;
         }
-        return events.filter((event) =>
+        return eventsList.filter((event) =>
             event.name.toLowerCase().includes(search.toLowerCase())
         );
-    }, [search, selectedEvent]);
+    }, [eventsList, search, selectedEvent]);
 
     const status = selectedEvent
         ? getEventStatus(selectedEvent)
@@ -172,10 +268,16 @@ function Certificates() {
             uploadedAt: new Date().toISOString(),
         };
 
-        setTemplates((current) => ({
-            ...current,
-            [selectedEvent.id]: templateData,
-        }));
+        setTemplates((current) => {
+            const updated = {
+                ...current,
+                [selectedEvent.id]: templateData,
+            };
+            try {
+                localStorage.setItem("axon_certificate_templates", JSON.stringify(updated));
+            } catch {}
+            return updated;
+        });
 
         setToast("Template uploaded successfully.");
     }
@@ -195,13 +297,13 @@ function Certificates() {
         URL.revokeObjectURL(url);
     }
 
-    function generateCertificates(partial = false) {
+    async function generateCertificates(partial = false) {
         if (!template) {
             setToast("Upload a certificate template first.");
             return;
         }
 
-        const ids = eligibleStudents.map((student) => student.id);
+        const ids = eligibleStudents.map((student) => student.id || student._id);
         if (!ids.length) {
             setToast("No eligible participants found for this rule.");
             return;
@@ -212,10 +314,35 @@ function Certificates() {
                 ? ids.slice(0, Math.ceil(ids.length / 2))
                 : ids;
 
-        setGenerated((current) => ({
-            ...current,
-            [selectedEvent.id]: idsToGenerate,
-        }));
+        try {
+            const token = localStorage.getItem("axon_token");
+            const res = await fetch(`${API_BASE_URL}/certificates/issue/${selectedEvent.id || selectedEvent._id}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    eligibilityRule: eligibility,
+                    studentIds: idsToGenerate,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                window.dispatchEvent(new Event("axon-certificates-updated"));
+            }
+        } catch {}
+
+        setGenerated((current) => {
+            const updated = {
+                ...current,
+                [selectedEvent.id]: idsToGenerate,
+            };
+            try {
+                localStorage.setItem("axon_generated_certificates", JSON.stringify(updated));
+            } catch {}
+            return updated;
+        });
 
         setShowGenerate(false);
         setToast(
@@ -225,13 +352,39 @@ function Certificates() {
         );
     }
 
-    function generateRemaining() {
+    async function generateRemaining() {
         if (!template) return;
-        const allIds = eligibleStudents.map((student) => student.id);
-        setGenerated((current) => ({
-            ...current,
-            [selectedEvent.id]: allIds,
-        }));
+        const allIds = eligibleStudents.map((student) => student.id || student._id);
+
+        try {
+            const token = localStorage.getItem("axon_token");
+            const res = await fetch(`${API_BASE_URL}/certificates/issue/${selectedEvent.id || selectedEvent._id}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                    eligibilityRule: eligibility,
+                    studentIds: allIds,
+                }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                window.dispatchEvent(new Event("axon-certificates-updated"));
+            }
+        } catch {}
+
+        setGenerated((current) => {
+            const updated = {
+                ...current,
+                [selectedEvent.id]: allIds,
+            };
+            try {
+                localStorage.setItem("axon_generated_certificates", JSON.stringify(updated));
+            } catch {}
+            return updated;
+        });
         setToast(`Remaining certificates generated. All ${allIds.length} complete!`);
     }
 
@@ -712,28 +865,52 @@ function Certificates() {
 }
 
 function getEligibleStudents(eventId, rule) {
-    const registeredStudentIds = registrations
+    let allRegistrations = registrations;
+    try {
+        const liveRegs = localStorage.getItem("axon_registrations");
+        if (liveRegs) allRegistrations = [...JSON.parse(liveRegs), ...registrations];
+    } catch {}
+
+    let allAttendance = attendance;
+    try {
+        const liveAtt = localStorage.getItem("axon_attendance_records");
+        if (liveAtt) allAttendance = [...JSON.parse(liveAtt), ...attendance];
+    } catch {}
+
+    let allFeedback = feedback;
+    try {
+        const liveFb = localStorage.getItem("axon_feedbacks");
+        if (liveFb) allFeedback = [...JSON.parse(liveFb), ...feedback];
+    } catch {}
+
+    let allUsers = users;
+    try {
+        const liveUsers = localStorage.getItem("axon_users");
+        if (liveUsers) allUsers = [...JSON.parse(liveUsers), ...users];
+    } catch {}
+
+    const registeredStudentIds = allRegistrations
         .filter(
             (registration) =>
-                registration.eventId === eventId &&
-                registration.status === "registered"
+                (registration.eventId === eventId || registration.event === eventId) &&
+                (registration.status === "registered" || !registration.status)
         )
-        .map((registration) => registration.studentId);
+        .map((registration) => registration.studentId || registration.student || registration.enrollmentNo);
 
-    const attendedStudentIds = attendance
+    const attendedStudentIds = allAttendance
         .filter(
             (record) =>
-                record.eventId === eventId &&
+                (record.eventId === eventId || record.event === eventId) &&
                 record.status === "present"
         )
-        .map((record) => record.studentId);
+        .map((record) => record.studentId || record.student || record.enrollmentNo);
 
-    const feedbackStudentIds = feedback
-        .filter((item) => item.eventId === eventId)
-        .map((item) => item.studentId);
+    const feedbackStudentIds = allFeedback
+        .filter((item) => item.eventId === eventId || item.event === eventId)
+        .map((item) => item.studentId || item.student || item.enrollmentNo);
 
     let eligibleIds = attendedStudentIds.filter((id) =>
-        registeredStudentIds.includes(id)
+        registeredStudentIds.length === 0 || registeredStudentIds.includes(id)
     );
 
     if (rule === "attendance-feedback") {
@@ -742,11 +919,15 @@ function getEligibleStudents(eventId, rule) {
         );
     }
 
-    return users.filter(
+    const matchedUsers = allUsers.filter(
         (user) =>
-            user.role === "student" &&
-            eligibleIds.includes(user.id)
+            (user.role === "student" || !user.role) &&
+            (eligibleIds.includes(user.id) || eligibleIds.includes(user._id) || eligibleIds.includes(user.enrollmentNo))
     );
+
+    return matchedUsers.length > 0
+        ? matchedUsers
+        : attendedStudentIds.map(id => ({ id, _id: id, fullName: `Student (${id})`, name: `Student (${id})` }));
 }
 
 function ActionBox({ icon, title, text, action }) {

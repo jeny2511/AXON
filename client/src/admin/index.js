@@ -7,7 +7,6 @@ export { default as UpcomingEvents } from "./components/UpcomingEvents";
 export { default as Dashboard } from "./pages/Dashboard";
 export { default as Events } from "./pages/Events";
 export { default as Volunteers } from "./pages/Volunteers";
-export { default as AddVolunteer } from "./pages/AddVolunteer";
 export { default as Attendance } from "./pages/Attendance";
 export { default as Analysis } from "./pages/Analysis";
 export { default as Feedback } from "./pages/Feedback";

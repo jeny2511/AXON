@@ -45,7 +45,6 @@ import AdminFeedback from "./admin/pages/Feedback";
 import AdminGallery from "./admin/pages/Gallery";
 import AdminTaskProgress from "./admin/pages/TaskProgress";
 import AdminReports from "./admin/pages/Reports";
-import AdminAddVolunteer from "./admin/pages/AddVolunteer";
 import AdminProfile from "./admin/pages/Profile";
 
 // Root Redirection Helper
@@ -257,7 +256,7 @@ function App() {
         <Route path="gallery" element={<AdminGallery />} />
         <Route path="tasks" element={<AdminTaskProgress />} />
         <Route path="reports" element={<AdminReports />} />
-        <Route path="add-volunteer" element={<AdminAddVolunteer />} />
+        <Route path="add-volunteer" element={<Navigate to="/admin/volunteers" replace />} />
         <Route path="profile" element={<AdminProfile />} />
       </Route>
 

@@ -15,9 +15,13 @@ const feedbackQuestionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["rating", "textarea", "boolean"],
+      enum: ["rating", "textarea", "boolean", "radio", "checkbox", "text", "select"],
       default: "rating",
     },
+    options: [{
+      type: String,
+      trim: true,
+    }],
     scale: {
       type: Number,
       default: 5,

@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, Navigate } from "react-router-dom";
 import AdminLayout from "../layouts/AdminLayout";
 import Dashboard from "../pages/Dashboard";
 import Events from "../pages/Events";
@@ -10,7 +10,6 @@ import Feedback from "../pages/Feedback";
 import Gallery from "../pages/Gallery";
 import TaskProgress from "../pages/TaskProgress";
 import Reports from "../pages/Reports";
-import AddVolunteer from "../pages/AddVolunteer";
 import Profile from "../pages/Profile";
 
 function AdminRoutes() {
@@ -27,7 +26,7 @@ function AdminRoutes() {
         <Route path="gallery" element={<Gallery />} />
         <Route path="tasks" element={<TaskProgress />} />
         <Route path="reports" element={<Reports />} />
-        <Route path="add-volunteer" element={<AddVolunteer />} />
+        <Route path="add-volunteer" element={<Navigate to="/admin/volunteers" replace />} />
         <Route path="profile" element={<Profile />} />
       </Route>
     </Routes>

@@ -1,40 +1,22 @@
-import { Search, Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 
 function Header({ onMenuClick }) {
   return (
-    <header className="top-header">
+    <header className="sticky top-0 z-30 flex h-[60px] w-full items-center justify-end border-b border-gray-200 bg-white px-4 sm:px-5 lg:px-6">
+
+      {/* Mobile menu button */}
       <button
-        className="mobile-menu-button"
+        type="button"
         onClick={onMenuClick}
+        className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100 lg:hidden"
         aria-label="Open menu"
       >
-        <Menu size={21} />
+        <Menu size={22} />
       </button>
 
-      <div className="search-box">
-        <Search size={17} />
-        <input
-          type="text"
-          placeholder="Search events, volunteers, students..."
-        />
-      </div>
-
-      <div className="header-right">
-        <button className="notification-button" aria-label="Notifications">
-          <Bell size={19} />
-          <span className="notification-dot"></span>
-        </button>
-
-        <div className="header-admin">
-          <div className="header-avatar">A</div>
-          <div>
-            <strong>Admin</strong>
-            <span>Administrator</span>
-          </div>
-        </div>
-      </div>
     </header>
   );
 }
 
 export default Header;
+

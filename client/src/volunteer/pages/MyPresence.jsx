@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
@@ -7,12 +7,14 @@ import {
   UserCheck,
 } from "lucide-react";
 
-import { attendance, events, users } from "../../mockData";
+import { attendance, events as initialMockEvents, users } from "../../mockData";
+import { getAuthUser } from "../../services/authService";
+import { API_BASE_URL } from "../../services/api";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
-  const dateObj = new Date(`${dateStr}T00:00:00`);
-  if (isNaN(dateObj)) return dateStr;
+  const dateObj = new Date(`${dateStr}`.includes("T") ? dateStr : `${dateStr}T00:00:00`);
+  if (isNaN(dateObj.getTime())) return dateStr;
   return dateObj.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -35,9 +37,22 @@ function formatTime(timeStr) {
 
 function MyPresence() {
   const [search, setSearch] = useState("");
+  const [eventsList, setEventsList] = useState(() => {
+    try {
+      const saved = localStorage.getItem("axon_live_events");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialMockEvents;
+  });
 
   // Current logged in volunteer
   const currentVolunteer = useMemo(() => {
+    const authUser = getAuthUser();
+    if (authUser) return authUser;
+
     try {
       const stored = localStorage.getItem("axon_volunteer_user");
       if (stored) {
@@ -60,17 +75,24 @@ function MyPresence() {
 
   // Events where this volunteer's attendance has been marked present by Admin
   const attendedEvents = useMemo(() => {
-    const volunteerId = currentVolunteer?.id || "VL002";
+    const volunteerId = currentVolunteer?.id || currentVolunteer?._id || currentVolunteer?.userId || "VL002";
 
     // Find all event IDs where volunteer's attendance is marked present
-    const markedEventIds = attendance
+    let allAttendance = attendance;
+    try {
+      const liveAtt = localStorage.getItem("axon_attendance_records");
+      if (liveAtt) allAttendance = [...JSON.parse(liveAtt), ...attendance];
+    } catch {}
+
+    const markedEventIds = allAttendance
       .filter(
         (record) =>
           (record.studentId === volunteerId ||
-            record.verifiedBy === volunteerId) &&
+            record.verifiedBy === volunteerId ||
+            record.student === volunteerId) &&
           record.status === "present"
       )
-      .map((record) => record.eventId);
+      .map((record) => record.eventId || record.event);
 
     // Fallback default events where volunteer attendance is registered/marked
     const activeEventIds = [
@@ -83,8 +105,8 @@ function MyPresence() {
       ),
     ];
 
-    return events.filter((event) => activeEventIds.includes(event.id));
-  }, [currentVolunteer]);
+    return eventsList.filter((event) => activeEventIds.includes(event.id) || activeEventIds.includes(event._id));
+  }, [currentVolunteer, eventsList]);
 
   // Filtered by search if user types in search bar
   const filteredEvents = useMemo(() => {

@@ -15,13 +15,14 @@ import {
   X,
 } from "lucide-react";
 
-import { gallery } from "../../mockData";
+import { gallery as initialMockGallery } from "../../mockData";
+import { API_BASE_URL } from "../../services/api";
 
 // Format date helper
 function formatDate(dateStr) {
   if (!dateStr) return "";
   const dateObj = new Date(`${dateStr}`.includes("T") ? dateStr : `${dateStr}T00:00:00`);
-  if (isNaN(dateObj)) return dateStr;
+  if (isNaN(dateObj.getTime())) return dateStr;
   return dateObj.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -43,7 +44,16 @@ const initialFormState = {
 };
 
 function EventGallery() {
-  const [galleries, setGalleries] = useState(gallery);
+  const [galleries, setGalleries] = useState(() => {
+    try {
+      const saved = localStorage.getItem("axon_gallery_albums");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return initialMockGallery;
+  });
   const [search, setSearch] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -54,6 +64,48 @@ function EventGallery() {
   const [photoIndex, setPhotoIndex] = useState(0);
 
   const [form, setForm] = useState(initialFormState);
+
+  // Fetch live gallery from backend
+  useEffect(() => {
+    const fetchGalleries = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/gallery`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.albums) && data.albums.length > 0) {
+          const normalized = data.albums.map((item) => ({
+            galleryId: item._id || item.galleryId || item.id,
+            _id: item._id || item.galleryId || item.id,
+            eventName: item.eventName || item.title,
+            speakerName: item.speakerName || "TCF Team",
+            eventDate: item.eventDate ? item.eventDate.split("T")[0] : "",
+            eventEndDate: item.eventEndDate ? item.eventEndDate.split("T")[0] : "",
+            eventTime: item.eventTime || `${item.startTime || "10:00"} - ${item.endTime || "12:00"}`,
+            startTime: item.startTime || "10:00",
+            endTime: item.endTime || "12:00",
+            venue: item.venue || "Campus Venue",
+            category: item.category || "Workshop",
+            description: item.description || "",
+            coverImage: item.coverImage || (item.photos && item.photos[0]) || "",
+            photos: Array.isArray(item.photos) ? item.photos : [],
+            videos: [],
+            totalPhotos: Array.isArray(item.photos) ? item.photos.length : 0,
+          }));
+          setGalleries(normalized);
+          localStorage.setItem("axon_gallery_albums", JSON.stringify(normalized));
+        }
+      } catch {}
+    };
+    fetchGalleries();
+
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem("axon_gallery_albums");
+        if (saved) setGalleries(JSON.parse(saved));
+      } catch {}
+    };
+    window.addEventListener("axon-gallery-updated", handleSync);
+    return () => window.removeEventListener("axon-gallery-updated", handleSync);
+  }, []);
 
   const filteredGalleries = useMemo(() => {
     if (!search.trim()) return galleries;
@@ -123,7 +175,7 @@ function EventGallery() {
     setEditMode(true);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.eventName.trim()) {
       setToast("Please enter event name.");
       return;
@@ -167,13 +219,33 @@ function EventGallery() {
       totalPhotos: form.photos.length,
     };
 
-    setGalleries((current) => [newGallery, ...current]);
+    try {
+      const token = localStorage.getItem("axon_token");
+      await fetch(`${API_BASE_URL}/gallery`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(newGallery),
+      });
+    } catch {}
+
+    setGalleries((current) => {
+      const updated = [newGallery, ...current];
+      try {
+        localStorage.setItem("axon_gallery_albums", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    window.dispatchEvent(new Event("axon-gallery-updated"));
     setShowCreate(false);
     setForm(initialFormState);
     setToast("Event gallery created successfully.");
   }
 
-  function handleUpdate() {
+  async function handleUpdate() {
     if (!form.eventName.trim()) {
       setToast("Event name cannot be empty.");
       return;
@@ -216,22 +288,56 @@ function EventGallery() {
       totalPhotos: form.photos.length,
     };
 
-    setGalleries((current) =>
-      current.map((item) =>
-        item.galleryId === updated.galleryId ? updated : item
-      )
-    );
+    try {
+      const token = localStorage.getItem("axon_token");
+      const targetId = selectedGallery._id || selectedGallery.galleryId;
+      await fetch(`${API_BASE_URL}/gallery/${targetId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(updated),
+      });
+    } catch {}
 
+    setGalleries((current) => {
+      const list = current.map((item) =>
+        (item.galleryId === updated.galleryId || item._id === updated._id) ? updated : item
+      );
+      try {
+        localStorage.setItem("axon_gallery_albums", JSON.stringify(list));
+      } catch {}
+      return list;
+    });
+
+    window.dispatchEvent(new Event("axon-gallery-updated"));
     setSelectedGallery(updated);
     setEditMode(false);
     setPhotoIndex(0);
     setToast("Gallery updated successfully.");
   }
 
-  function handleDelete(galleryId) {
-    setGalleries((current) =>
-      current.filter((item) => item.galleryId !== galleryId)
-    );
+  async function handleDelete(galleryId) {
+    try {
+      const token = localStorage.getItem("axon_token");
+      const target = galleries.find(g => g.galleryId === galleryId || g._id === galleryId);
+      const targetId = target?._id || galleryId;
+      await fetch(`${API_BASE_URL}/gallery/${targetId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch {}
+
+    setGalleries((current) => {
+      const list = current.filter((item) => item.galleryId !== galleryId && item._id !== galleryId);
+      try {
+        localStorage.setItem("axon_gallery_albums", JSON.stringify(list));
+      } catch {}
+      return list;
+    });
+
+    window.dispatchEvent(new Event("axon-gallery-updated"));
     setSelectedGallery(null);
     setToast("Gallery entry removed.");
   }
@@ -247,12 +353,16 @@ function EventGallery() {
     }
 
     const filesToProcess = files.slice(0, availableSlots);
-    const imageUrls = filesToProcess.map((file) => URL.createObjectURL(file));
-
-    setForm((current) => ({
-      ...current,
-      photos: [...current.photos, ...imageUrls].slice(0, 6),
-    }));
+    filesToProcess.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setForm((current) => ({
+          ...current,
+          photos: [...current.photos, event.target.result].slice(0, 6),
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
 
     if (files.length > availableSlots) {
       setToast(`Only ${availableSlots} photo(s) added. Maximum limit is 6.`);
