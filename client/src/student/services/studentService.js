@@ -23,6 +23,46 @@ export function setActiveStudentId(studentId) {
   }
 }
 
+// Get the authenticated user object from localStorage
+export function getActiveStudentUser() {
+  const stored = localStorage.getItem("axon_auth_user");
+  if (stored) {
+    try {
+      const u = JSON.parse(stored);
+      if (u) return u;
+    } catch {
+      // Fallback
+    }
+  }
+  return null;
+}
+
+// Maps MongoDB _id, enrollment number, or ST00x IDs interchangeably
+export function resolveStudentId(studentId) {
+  if (!studentId) {
+    const user = getActiveStudentUser();
+    studentId = user?.id || user?._id || localStorage.getItem("axon_auth_student_id");
+  }
+  if (!studentId) return "ST001";
+
+  if (typeof studentId === "string" && studentId.startsWith("ST")) {
+    return studentId;
+  }
+
+  const user = getActiveStudentUser();
+  const enrollment = user?.enrollmentNumber || user?.enrollmentNo || (typeof studentId === "string" && /^\d+$/.test(studentId) ? studentId : null);
+  const email = user?.email;
+
+  const matched = mockUsers.find(
+    (u) =>
+      u.id === studentId ||
+      (enrollment && u.enrollmentNo === enrollment) ||
+      (email && u.email?.toLowerCase() === email.toLowerCase())
+  );
+
+  return matched ? matched.id : studentId;
+}
+
 // --------------------------------------------
 // EVENTS
 // --------------------------------------------
@@ -70,8 +110,20 @@ function getAllRegistrations() {
 }
 
 export function getStudentRegistrations(studentId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+  const enrollment = activeUser?.enrollmentNumber || activeUser?.enrollmentNo;
+
   const allRegs = getAllRegistrations();
-  return allRegs.filter((reg) => reg.studentId === studentId);
+  return allRegs.filter((reg) => {
+    return (
+      reg.studentId === resolvedId ||
+      reg.studentId === studentId ||
+      (rawId && reg.studentId === rawId) ||
+      (enrollment && reg.studentId === enrollment)
+    );
+  });
 }
 
 export function isStudentRegistered(studentId, eventId) {
@@ -199,14 +251,29 @@ export function getRegisteredEvents(studentId) {
 // --------------------------------------------
 
 export function getStudentCertificates(studentId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   return mockCertificates.filter(
-    (certificate) => certificate.studentId === studentId
+    (certificate) =>
+      certificate.studentId === resolvedId ||
+      certificate.studentId === studentId ||
+      (rawId && certificate.studentId === rawId)
   );
 }
 
 export function getStudentCertificateForEvent(studentId, eventId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   return mockCertificates.find(
-    (cert) => cert.studentId === studentId && cert.eventId === eventId
+    (cert) =>
+      (cert.studentId === resolvedId ||
+        cert.studentId === studentId ||
+        (rawId && cert.studentId === rawId)) &&
+      cert.eventId === eventId
   );
 }
 
@@ -215,24 +282,42 @@ export function getStudentCertificateForEvent(studentId, eventId) {
 // --------------------------------------------
 
 export function getStudentFeedback(studentId) {
-  return mockFeedback.filter((item) => item.studentId === studentId);
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
+  return mockFeedback.filter(
+    (item) =>
+      item.studentId === resolvedId ||
+      item.studentId === studentId ||
+      (rawId && item.studentId === rawId)
+  );
 }
 
 export function hasSubmittedFeedback(studentId, eventId) {
-  const localSaved = localStorage.getItem(
-    `axon_feedback_${studentId}_${eventId}`
-  );
+  const resolvedId = resolveStudentId(studentId);
+  const localSaved =
+    localStorage.getItem(`axon_feedback_${studentId}_${eventId}`) ||
+    localStorage.getItem(`axon_feedback_${resolvedId}_${eventId}`);
   if (localSaved) return true;
 
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   return mockFeedback.some(
-    (item) => item.studentId === studentId && item.eventId === eventId
+    (item) =>
+      (item.studentId === resolvedId ||
+        item.studentId === studentId ||
+        (rawId && item.studentId === rawId)) &&
+      item.eventId === eventId
   );
 }
 
 export function submitStudentFeedback(studentId, eventId, data) {
+  const resolvedId = resolveStudentId(studentId);
   const feedbackData = {
-    feedbackId: `FB_${studentId}_${eventId}`,
-    studentId,
+    feedbackId: `FB_${resolvedId}_${eventId}`,
+    studentId: resolvedId,
     eventId,
     overallRating: Number(data.overallRating),
     contentRating: Number(data.contentRating),
@@ -247,6 +332,10 @@ export function submitStudentFeedback(studentId, eventId, data) {
     `axon_feedback_${studentId}_${eventId}`,
     JSON.stringify(feedbackData)
   );
+  localStorage.setItem(
+    `axon_feedback_${resolvedId}_${eventId}`,
+    JSON.stringify(feedbackData)
+  );
 
   return feedbackData;
 }
@@ -256,19 +345,44 @@ export function submitStudentFeedback(studentId, eventId, data) {
 // --------------------------------------------
 
 export function getStudentAttendance(studentId) {
-  return mockAttendance.filter((item) => item.studentId === studentId);
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
+  return mockAttendance.filter(
+    (item) =>
+      item.studentId === resolvedId ||
+      item.studentId === studentId ||
+      (rawId && item.studentId === rawId)
+  );
 }
 
 export function getStudentAttendanceForEvent(studentId, eventId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   return mockAttendance.find(
-    (item) => item.studentId === studentId && item.eventId === eventId
+    (item) =>
+      (item.studentId === resolvedId ||
+        item.studentId === studentId ||
+        (rawId && item.studentId === rawId)) &&
+      item.eventId === eventId
   );
 }
 
 // Get events where student attendance is present
 export function getStudentCompletedEvents(studentId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   const presentAttendance = mockAttendance.filter(
-    (item) => item.studentId === studentId && item.status === "present"
+    (item) =>
+      (item.studentId === resolvedId ||
+        item.studentId === studentId ||
+        (rawId && item.studentId === rawId)) &&
+      item.status === "present"
   );
 
   return presentAttendance
@@ -339,8 +453,15 @@ export function getLearningResourcesByCategory(category) {
 // --------------------------------------------
 
 export function getStudentNotifications(studentId) {
+  const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const rawId = studentId || activeUser?.id || activeUser?._id;
+
   return mockNotifications.filter(
-    (notification) => notification.userId === studentId
+    (notification) =>
+      notification.userId === resolvedId ||
+      notification.userId === studentId ||
+      (rawId && notification.userId === rawId)
   );
 }
 
@@ -349,7 +470,14 @@ export function getStudentNotifications(studentId) {
 // --------------------------------------------
 
 export function getStudentProfile(studentId) {
-  const stored = localStorage.getItem(`axon_profile_${studentId}`);
+  const activeUser = getActiveStudentUser();
+  const resolvedId = resolveStudentId(studentId);
+
+  const stored =
+    localStorage.getItem(`axon_profile_${resolvedId}`) ||
+    (activeUser?.id ? localStorage.getItem(`axon_profile_${activeUser.id}`) : null) ||
+    (studentId ? localStorage.getItem(`axon_profile_${studentId}`) : null);
+
   if (stored) {
     try {
       return JSON.parse(stored);
@@ -358,20 +486,76 @@ export function getStudentProfile(studentId) {
     }
   }
 
-  const user = mockUsers.find(
-    (u) => u.id === studentId && u.role === "student"
+  const mockUser = mockUsers.find(
+    (u) =>
+      u.id === resolvedId ||
+      u.id === studentId ||
+      u.enrollmentNo === resolvedId ||
+      (activeUser?.enrollmentNumber && u.enrollmentNo === activeUser.enrollmentNumber)
   );
-  if (!user) return null;
 
-  return {
-    ...user,
-    batch: user.batch || `${2025 - (user.year || 3) + 1}-${2029 - (user.year || 3) + 1}`,
-  };
+  if (activeUser && (activeUser.role === "student" || !activeUser.role)) {
+    return {
+      id: resolvedId || activeUser.id || activeUser._id,
+      fullName: activeUser.fullName || mockUser?.fullName || "Student",
+      enrollmentNo:
+        activeUser.enrollmentNumber ||
+        activeUser.enrollmentNo ||
+        mockUser?.enrollmentNo ||
+        "220130107054",
+      email: activeUser.email || mockUser?.email || "student@vgec.ac.in",
+      phone:
+        activeUser.phoneNumber ||
+        activeUser.phone ||
+        mockUser?.phone ||
+        "9876543210",
+      department: activeUser.department || mockUser?.department || "IT",
+      year:
+        activeUser.academicDetails?.currentYear ||
+        activeUser.year ||
+        mockUser?.year ||
+        3,
+      semester:
+        activeUser.academicDetails?.currentSemester ||
+        activeUser.semester ||
+        mockUser?.semester ||
+        5,
+      batch: activeUser.academicDetails?.batch
+        ? `${activeUser.academicDetails.batch.startYear}-${activeUser.academicDetails.batch.endYear}`
+        : (typeof activeUser.batch === "object"
+            ? `${activeUser.batch.startYear}-${activeUser.batch.endYear}`
+            : activeUser.batch) ||
+          mockUser?.batch ||
+          "2024-2028",
+      profilePhoto:
+        activeUser.profilePhoto ||
+        mockUser?.profilePhoto ||
+        "/assets/images/profile/default.jpg",
+      role: "student",
+      isActive: true,
+    };
+  }
+
+  if (mockUser) {
+    return {
+      ...mockUser,
+      batch:
+        mockUser.batch ||
+        `${2025 - (mockUser.year || 3) + 1}-${2029 - (mockUser.year || 3) + 1}`,
+    };
+  }
+
+  return null;
 }
 
 export function updateStudentProfile(studentId, updatedData) {
   const current = getStudentProfile(studentId);
   const merged = { ...current, ...updatedData };
+  const resolvedId = resolveStudentId(studentId);
+
   localStorage.setItem(`axon_profile_${studentId}`, JSON.stringify(merged));
+  if (resolvedId && resolvedId !== studentId) {
+    localStorage.setItem(`axon_profile_${resolvedId}`, JSON.stringify(merged));
+  }
   return merged;
 }
