@@ -30,7 +30,6 @@ import {
   History,
   ShieldCheck,
   ShieldAlert,
-  Upload,
 } from "lucide-react";
 import {
   events as mockEvents,
@@ -1867,11 +1866,9 @@ export default function Registrations() {
             </div>
           </header>
 
-          {/* 2. MAIN SCANNER BODY */}
-          <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden">
-            {/* LEFT / CENTER: VIEWFINDER & HUD */}
-            <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-              {/* Live Video Camera Stream */}
+          {/* 2. MAIN SCANNER BODY (FULL-SCREEN VIEWFINDER & HUD) */}
+          <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+            {/* Live Video Camera Stream */}
               <video
                 ref={videoRef}
                 playsInline
@@ -2063,180 +2060,6 @@ export default function Registrations() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* RIGHT SIDEBAR / DRAWER: HARDWARE INPUT & REAL-TIME FEED */}
-            <div className="w-full lg:w-96 bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-800 flex flex-col h-72 sm:h-80 lg:h-auto shrink-0 z-10">
-              {/* Sidebar Header */}
-              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-[#7040d0]/20 rounded-lg text-[#7040d0]">
-                    <QrCode size={16} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white">Scanner Control & Input</h3>
-                    <p className="text-[10px] text-gray-400">Auto-validates on scan</p>
-                  </div>
-                </div>
-
-                {/* Upload Image QR pass button */}
-                <label className="cursor-pointer p-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg border border-gray-700 transition-colors flex items-center gap-1 text-[11px]">
-                  <Upload size={13} />
-                  <span>Upload QR</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if ("BarcodeDetector" in window) {
-                        try {
-                          const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-                          const bitmap = await createImageBitmap(file);
-                          const barcodes = await detector.detect(bitmap);
-                          if (barcodes.length > 0) {
-                            handleValidateQR(barcodes[0].rawValue);
-                          } else {
-                            alert("No QR code detected in the uploaded image.");
-                          }
-                        } catch (err) {
-                          alert("QR detection failed: " + err.message);
-                        }
-                      } else {
-                        alert(
-                          "Direct image scanning requires BarcodeDetector API. Please type enrollment or click sample passes below."
-                        );
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-
-              {/* Barcode Gun / Manual Input Row */}
-              <div className="p-3 border-b border-gray-800 bg-gray-950/40">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!scannerGunInput.trim()) return;
-                    handleValidateQR(scannerGunInput.trim());
-                    setScannerGunInput("");
-                  }}
-                  className="space-y-1.5"
-                >
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                    USB Barcode Gun / Manual Enrollment
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={scannerGunInput}
-                      onChange={(e) => setScannerGunInput(e.target.value)}
-                      placeholder="Scan with gun or type (e.g. 24IT001)..."
-                      className="flex-1 h-9 px-3 bg-gray-900 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#7040d0] uppercase"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!scannerGunInput.trim()}
-                      className="h-9 px-3 bg-[#7040d0] hover:bg-[#5b32af] disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition-colors"
-                    >
-                      Verify
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Quick Sample QR Passes (One-Click Demo) */}
-              <div className="p-3 border-b border-gray-800 bg-gray-950/20">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles size={11} className="text-purple-400" /> Demo QR Passes (Test 1-Click)
-                  </span>
-                  <span className="text-[10px] text-gray-500">
-                    {participants.filter((p) => p.status === "absent").length} absent
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                  {participants
-                    .filter((p) => p.status === "absent")
-                    .slice(0, 8)
-                    .map((p) => (
-                      <button
-                        key={p.enrollmentNo}
-                        type="button"
-                        onClick={() => handleValidateQR(`QR-${selectedEvent.id}-${p.enrollmentNo}`)}
-                        className="px-2 py-1 bg-gray-800 hover:bg-[#7040d0] text-gray-200 hover:text-white rounded text-[11px] font-mono border border-gray-700 hover:border-purple-400 transition-colors flex items-center gap-1"
-                        title={`Scan QR code for ${p.name}`}
-                      >
-                        <span>{p.enrollmentNo}</span>
-                        <span className="text-gray-400 text-[9px]">({p.department})</span>
-                      </button>
-                    ))}
-
-                  {participants.filter((p) => p.status === "absent").length === 0 && (
-                    <p className="text-[11px] text-emerald-400 py-1">
-                      🎉 100% Turnout! All registered students are marked Present.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Live Session Recent Scans Feed */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-gray-400 font-semibold px-1">
-                  <span className="flex items-center gap-1">
-                    <History size={12} /> Recent Verified Scans ({recentScans.length})
-                  </span>
-                </div>
-
-                {recentScans.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-xs">
-                    <QrCode size={24} className="mx-auto mb-1.5 opacity-40" />
-                    <p>No scans recorded yet in this session</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">
-                      Scanned passes will appear here in real time
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {recentScans.map((scan) => (
-                      <div
-                        key={scan.id}
-                        className="p-2.5 rounded-xl bg-gray-950/70 border border-gray-800 flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <div>
-                            <p className="font-bold text-gray-100">{scan.studentName}</p>
-                            <p className="text-[10px] font-mono text-purple-300">
-                              {scan.enrollmentNo} • {scan.department}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                          {scan.time}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Sidebar Footer */}
-              <div className="p-3 border-t border-gray-800 bg-gray-950 flex items-center justify-between text-[11px] text-gray-400">
-                <span>
-                  Present: <strong className="text-emerald-400">{presentCount}</strong> / {registeredCount}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCloseScanner}
-                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg text-xs font-semibold transition-colors"
-                >
-                  Done Scanning
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
