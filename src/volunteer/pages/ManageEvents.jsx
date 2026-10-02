@@ -154,6 +154,7 @@ function ManageEvents() {
     name: "",
     speakerName: "",
     eventDate: "",
+    eventEndDate: "",
     startTime: "",
     endTime: "",
     venue: "",
@@ -166,13 +167,8 @@ function ManageEvents() {
     participantLimit: 100,
     poster: "", // Uploaded poster filename / preview URL
     rulebook: "", // Uploaded rulebook PDF filename
-    // Individual Year + Department combinations (e.g. "1st Year IT", "2nd Year CS")
-    eligibleCombinations: [
-      "1st Year IT",
-      "2nd Year CS",
-      "2nd Year IT",
-      "3rd Year EC",
-    ],
+    // Individual Year + Department combinations (starts empty, user selects as needed)
+    eligibleCombinations: [],
   };
 
   const [formData, setFormData] = useState(defaultFormData);
@@ -281,6 +277,7 @@ function ManageEvents() {
       name: event.name || "",
       speakerName: event.speakerName || "",
       eventDate: event.eventDate || "",
+      eventEndDate: event.eventEndDate || event.eventDate || "",
       startTime: event.startTime || "",
       endTime: event.endTime || "",
       venue: event.venue || "",
@@ -397,6 +394,65 @@ function ManageEvents() {
       setFormError("Event date is required.");
       return;
     }
+    if (!formData.startTime) {
+      setFormError("Start time is required.");
+      return;
+    }
+    if (!formData.endTime) {
+      setFormError("End time is required.");
+      return;
+    }
+    if (!formData.venue.trim()) {
+      setFormError("Venue of event is required.");
+      return;
+    }
+    if (!formData.category) {
+      setFormError("Type of event is required.");
+      return;
+    }
+    if (!formData.description.trim()) {
+      setFormError("Description of event is required.");
+      return;
+    }
+    if (!formData.registrationOpen) {
+      setFormError("Registration window opening time is required.");
+      return;
+    }
+    if (!formData.registrationClose) {
+      setFormError("Registration window closing time is required.");
+      return;
+    }
+    if (!formData.attendanceOpen) {
+      setFormError("Attendance window opening time is required.");
+      return;
+    }
+    if (!formData.attendanceClose) {
+      setFormError("Attendance window closing time is required.");
+      return;
+    }
+    if (!formData.participantLimit || Number(formData.participantLimit) <= 0) {
+      setFormError("Participants limit is required and must be greater than 0.");
+      return;
+    }
+
+    // If eventEndDate is not selected, defaults to eventDate
+    const finalEndDate = formData.eventEndDate?.trim()
+      ? formData.eventEndDate
+      : formData.eventDate;
+
+    // Check if end date is earlier than start date
+    if (finalEndDate < formData.eventDate) {
+      setFormError("Event end date cannot be earlier than event start date.");
+      return;
+    }
+
+    // If event is on the same date, end time must be chronologically after start time
+    if (finalEndDate === formData.eventDate && formData.endTime <= formData.startTime) {
+      setFormError(
+        "For events on the same day, end time must be after start time."
+      );
+      return;
+    }
 
     // Extract unique years and departments for backwards compatibility
     const combos = formData.eligibleCombinations || [];
@@ -417,6 +473,7 @@ function ManageEvents() {
 
     const eventPayload = {
       ...formData,
+      eventEndDate: finalEndDate,
       eligibleYears: derivedYears,
       eligibleDepartments: derivedDepts,
     };
@@ -682,7 +739,13 @@ function ManageEvents() {
 
                     {/* Column 2: Date */}
                     <td className="py-4 px-5 text-gray-800 font-medium">
-                      {formatDate(event.eventDate)}
+                      <div>{formatDate(event.eventDate)}</div>
+                      {event.eventEndDate &&
+                        event.eventEndDate !== event.eventDate && (
+                          <div className="text-[11px] text-gray-500 font-normal">
+                            to {formatDate(event.eventEndDate)}
+                          </div>
+                        )}
                     </td>
 
                     {/* Column 3: Time */}
@@ -823,49 +886,118 @@ function ManageEvents() {
                 </div>
               </div>
 
-              {/* 2. Date & Time of Event */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1.5">
-                    Date of event <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.eventDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, eventDate: e.target.value })
-                    }
-                    className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg focus:border-[#7040d0] focus:ring-2 focus:ring-[#7040d0]/15 outline-none transition-all text-xs"
-                  />
+              {/* 2. Schedule: Start Schedule & End Schedule */}
+              <div className="p-3.5 bg-gray-50/70 rounded-xl border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-800 text-xs flex items-center gap-1.5">
+                    <Calendar size={14} className="text-[#7040d0]" />
+                    Event Schedule (Dates & Times)
+                  </span>
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    {formData.eventEndDate &&
+                    formData.eventEndDate !== formData.eventDate
+                      ? "Multi-day Event (End time on End Date)"
+                      : "Single-day Event (End time on Start Date)"}
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1.5">
-                    Start Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startTime: e.target.value })
-                    }
-                    className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg focus:border-[#7040d0] focus:ring-2 focus:ring-[#7040d0]/15 outline-none transition-all text-xs"
-                  />
-                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Start Schedule Box: Start Date & Start Time */}
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                      <span className="font-bold text-gray-800 text-xs">
+                        Start Schedule
+                      </span>
+                      <span className="text-[10px] text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded">
+                        Event Start
+                      </span>
+                    </div>
 
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1.5">
-                    End Time
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endTime: e.target.value })
-                    }
-                    className="w-full h-10 px-3 bg-white border border-gray-200 rounded-lg focus:border-[#7040d0] focus:ring-2 focus:ring-[#7040d0]/15 outline-none transition-all text-xs"
-                  />
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-1">
+                        Event Start Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.eventDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, eventDate: e.target.value })
+                        }
+                        className="w-full h-9 px-2.5 bg-white border border-gray-200 rounded-md focus:border-[#7040d0] focus:ring-1 focus:ring-[#7040d0]/20 outline-none text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-1">
+                        Start Time (on Start Date) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.startTime}
+                        onChange={(e) =>
+                          setFormData({ ...formData, startTime: e.target.value })
+                        }
+                        className="w-full h-9 px-2.5 bg-white border border-gray-200 rounded-md focus:border-[#7040d0] focus:ring-1 focus:ring-[#7040d0]/20 outline-none text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* End Schedule Box: End Date & End Time */}
+                  <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                      <span className="font-bold text-gray-800 text-xs">
+                        End Schedule
+                      </span>
+                      <span className="text-[10px] text-gray-500 font-medium">
+                        {formData.eventEndDate &&
+                        formData.eventEndDate !== formData.eventDate
+                          ? `Ends on ${formatDate(formData.eventEndDate)}`
+                          : "Ends on Start Date"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-1">
+                        Event End Date{" "}
+                        <span className="text-gray-400 font-normal text-[10px]">
+                          (Optional — defaults to Start Date)
+                        </span>
+                      </label>
+                      <input
+                        type="date"
+                        min={formData.eventDate || undefined}
+                        value={formData.eventEndDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, eventEndDate: e.target.value })
+                        }
+                        className="w-full h-9 px-2.5 bg-white border border-gray-200 rounded-md focus:border-[#7040d0] focus:ring-1 focus:ring-[#7040d0]/20 outline-none text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-1">
+                        End Time{" "}
+                        <span className="text-purple-700 font-medium text-[10px]">
+                          ({formData.eventEndDate &&
+                          formData.eventEndDate !== formData.eventDate
+                            ? "on End Date"
+                            : "on Start Date"})
+                        </span>{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={formData.endTime}
+                        onChange={(e) =>
+                          setFormData({ ...formData, endTime: e.target.value })
+                        }
+                        className="w-full h-9 px-2.5 bg-white border border-gray-200 rounded-md focus:border-[#7040d0] focus:ring-1 focus:ring-[#7040d0]/20 outline-none text-xs"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -873,10 +1005,11 @@ function ManageEvents() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1.5">
-                    Venue of event
+                    Venue of event <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={formData.venue}
                     onChange={(e) =>
                       setFormData({ ...formData, venue: e.target.value })
@@ -889,9 +1022,10 @@ function ManageEvents() {
                 {/* Field: Type of event (Category) */}
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1.5">
-                    Type of event
+                    Type of event <span className="text-red-500">*</span>
                   </label>
                   <select
+                    required
                     value={formData.category}
                     onChange={(e) =>
                       setFormData({ ...formData, category: e.target.value })
@@ -910,10 +1044,11 @@ function ManageEvents() {
               {/* 4. Description of Event */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1.5">
-                  Description of event
+                  Description of event <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   rows={3}
+                  required
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -931,9 +1066,12 @@ function ManageEvents() {
                     Registration Window
                   </p>
                   <div>
-                    <label className="block text-gray-600 mb-1">Opens at</label>
+                    <label className="block text-gray-600 mb-1 font-medium">
+                      Opens at <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="datetime-local"
+                      required
                       value={formData.registrationOpen}
                       onChange={(e) =>
                         setFormData({
@@ -945,9 +1083,12 @@ function ManageEvents() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">Closes at</label>
+                    <label className="block text-gray-600 mb-1 font-medium">
+                      Closes at <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="datetime-local"
+                      required
                       value={formData.registrationClose}
                       onChange={(e) =>
                         setFormData({
@@ -966,9 +1107,12 @@ function ManageEvents() {
                     Attendance Window
                   </p>
                   <div>
-                    <label className="block text-gray-600 mb-1">Opens at</label>
+                    <label className="block text-gray-600 mb-1 font-medium">
+                      Opens at <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="datetime-local"
+                      required
                       value={formData.attendanceOpen}
                       onChange={(e) =>
                         setFormData({
@@ -980,9 +1124,12 @@ function ManageEvents() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-600 mb-1">Closes at</label>
+                    <label className="block text-gray-600 mb-1 font-medium">
+                      Closes at <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="datetime-local"
+                      required
                       value={formData.attendanceClose}
                       onChange={(e) =>
                         setFormData({
@@ -999,10 +1146,11 @@ function ManageEvents() {
               {/* 6. Participants Limit Field */}
               <div>
                 <label className="block font-semibold text-gray-700 mb-1.5">
-                  Participants limit field
+                  Participants limit field <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
+                  required
                   min="1"
                   value={formData.participantLimit}
                   onChange={(e) =>
@@ -1073,9 +1221,6 @@ function ManageEvents() {
                   <div>
                     <p className="font-semibold text-gray-800 text-xs">
                       Conditions for Registration (Year & Department Combinations)
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      Select specific combinations allowed to register (e.g., 1st Year IT, 2nd Year CS).
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -1295,15 +1440,40 @@ function ManageEvents() {
               {/* Schedule and Location Grid */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 text-gray-700">
                 <div className="flex items-center gap-2">
-                  <Calendar size={15} className="text-purple-600" />
-                  <span>{formatDate(viewingEvent.eventDate)}</span>
+                  <Calendar size={15} className="text-purple-600 shrink-0" />
+                  <div>
+                    <span className="font-semibold text-gray-800">
+                      {formatDate(viewingEvent.eventDate)}
+                      {viewingEvent.eventEndDate &&
+                      viewingEvent.eventEndDate !== viewingEvent.eventDate
+                        ? ` to ${formatDate(viewingEvent.eventEndDate)}`
+                        : ""}
+                    </span>
+                    {viewingEvent.eventEndDate &&
+                      viewingEvent.eventEndDate !== viewingEvent.eventDate && (
+                        <span className="text-[10px] text-purple-700 block font-normal">
+                          Multi-day event
+                        </span>
+                      )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock size={15} className="text-purple-600" />
-                  <span>
-                    {formatTime(viewingEvent.startTime)} -{" "}
-                    {formatTime(viewingEvent.endTime)}
-                  </span>
+                  <Clock size={15} className="text-purple-600 shrink-0" />
+                  <div>
+                    {viewingEvent.eventEndDate &&
+                    viewingEvent.eventEndDate !== viewingEvent.eventDate ? (
+                      <span className="text-[11px] leading-tight block">
+                        Start: {formatTime(viewingEvent.startTime)} ({formatDate(viewingEvent.eventDate)})
+                        <br />
+                        End: {formatTime(viewingEvent.endTime)} ({formatDate(viewingEvent.eventEndDate)})
+                      </span>
+                    ) : (
+                      <span>
+                        {formatTime(viewingEvent.startTime)} -{" "}
+                        {formatTime(viewingEvent.endTime)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin size={15} className="text-purple-600" />
