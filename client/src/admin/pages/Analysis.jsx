@@ -60,7 +60,7 @@ function Analysis() {
         ? eventFeedback.reduce(
             (sum, item) =>
               sum + Number(
-                item.rating ?? item.feedbackRating ?? item.ratingValue ?? 0
+                item.overallRating ?? item.rating ?? item.feedbackRating ?? item.ratingValue ?? 0
               ),
             0
           ) / eventFeedback.length

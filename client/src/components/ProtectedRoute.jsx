@@ -1,11 +1,12 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { getCurrentUser, isLoggedIn } from "../../services/authService";
+import { getCurrentUser, isLoggedIn } from "../services/authService";
 
-function ProtectedRoute({ children }) {
+export function ProtectedRoute({ allowedRoles = [], children }) {
   const location = useLocation();
   const authenticated = isLoggedIn();
   const user = getCurrentUser();
 
+  // If not logged in, redirect immediately to the Common Login page
   if (!authenticated || !user) {
     return (
       <Navigate
@@ -15,14 +16,18 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // If a non-student tries to access student-only subpages
-  if (user.role !== "student") {
+  // If role is restricted and user's role is not authorized, redirect to their home dashboard
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    if (user.role === "student") {
+      return <Navigate to="/dashboard" replace />;
+    }
     if (user.role === "volunteer") {
       return <Navigate to="/volunteer" replace />;
     }
     if (user.role === "admin") {
       return <Navigate to="/admin" replace />;
     }
+    return <Navigate to="/login" replace />;
   }
 
   return children;

@@ -6,7 +6,7 @@ export { users } from "./users";
 
 // Student Event Data
 export { registrations } from "./registrations";
-export { attendance } from "./attendance";
+export { attendance, attendance as attendances } from "./attendance";
 export { feedback } from "./feedback";
 export { feedbackForms } from "./feedbackForms";
 export { certificates } from "./certificates";

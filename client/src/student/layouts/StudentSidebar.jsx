@@ -34,7 +34,7 @@ function StudentSidebar({ isOpen, onClose }) {
   const handleLogout = () => {
     logoutStudent();
     if (onClose) onClose();
-    navigate("/dashboard");
+    navigate("/login");
   };
 
   const handleLoginClick = () => {

@@ -165,5 +165,79 @@ export const notifications = [
       "You're successfully registered for Bug Bounty Bootcamp.",
     createdAt: "2027-10-19T11:25",
     isRead: true
+  },
+
+  // =========================
+  // VOLUNTEERS (VL001, VL002, VL003)
+  // =========================
+
+  {
+    notificationId: "NOT013",
+    userId: "VL001",
+    eventId: "EV001",
+    type: "task",
+    title: "Task Assigned: Registration Desk Setup",
+    message: "You have been assigned to handle registration verification for Capture The Flag 2027.",
+    createdAt: "2027-10-20T10:00",
+    isRead: false
+  },
+
+  {
+    notificationId: "NOT014",
+    userId: "VL001",
+    eventId: "EV003",
+    type: "report",
+    title: "Event Report Approved",
+    message: "Admin has reviewed and approved the report for Linux & Kali Hands-on Workshop.",
+    createdAt: "2027-09-30T16:45",
+    isRead: true
+  },
+
+  {
+    notificationId: "NOT015",
+    userId: "VL002",
+    eventId: "EV002",
+    type: "task",
+    title: "Task Assigned: Lab Setup & Tools Check",
+    message: "Please ensure all Kali Linux images and Wireshark tools are configured in Computer Lab 3.",
+    createdAt: "2027-10-27T11:30",
+    isRead: false
+  },
+
+  {
+    notificationId: "NOT016",
+    userId: "VL003",
+    eventId: "EV001",
+    type: "attendance",
+    title: "Attendance Desk Ready",
+    message: "Live QR scanning desk is scheduled to open 15 minutes before the CTF event starts.",
+    createdAt: "2027-10-23T13:30",
+    isRead: false
+  },
+
+  // =========================
+  // ADMIN (AD001)
+  // =========================
+
+  {
+    notificationId: "NOT017",
+    userId: "AD001",
+    eventId: "EV001",
+    type: "report",
+    title: "New Event Report Submitted",
+    message: "Aarav Patel (VL001) submitted the final event report for Capture The Flag 2027 for review.",
+    createdAt: "2027-10-24T18:00",
+    isRead: false
+  },
+
+  {
+    notificationId: "NOT018",
+    userId: "AD001",
+    eventId: "EV002",
+    type: "registration",
+    title: "Capacity Alert: Bug Bounty Bootcamp",
+    message: "Bug Bounty Bootcamp has reached 80% capacity with 58 registered students.",
+    createdAt: "2027-10-28T14:20",
+    isRead: false
   }
 ];

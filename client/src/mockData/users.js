@@ -12,6 +12,7 @@ export const users = [
     department: "IT",
     year: 3,
     semester: 5,
+    batch: "2024-2028",
     profilePhoto: "/assets/images/profile/jeny.jpg",
     isActive: true
   },
@@ -26,6 +27,7 @@ export const users = [
     department: "IT",
     year: 3,
     semester: 5,
+    batch: "2024-2028",
     profilePhoto: "/assets/images/profile/archi.jpg",
     isActive: true
   },
@@ -40,6 +42,7 @@ export const users = [
     department: "CE",
     year: 2,
     semester: 3,
+    batch: "2025-2029",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
@@ -54,6 +57,7 @@ export const users = [
     department: "ICT",
     year: 4,
     semester: 7,
+    batch: "2023-2027",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
@@ -68,6 +72,7 @@ export const users = [
     department: "IT",
     year: 2,
     semester: 3,
+    batch: "2025-2029",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
@@ -82,6 +87,7 @@ export const users = [
     department: "EC",
     year: 1,
     semester: 1,
+    batch: "2026-2030",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
@@ -99,6 +105,10 @@ export const users = [
     department: "IT",
     year: 3,
     semester: 5,
+    batch: "2024-2028",
+    committee: "Technical",
+    designation: "Technical Lead",
+    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/preyas.jpg",
     isActive: true
   },
@@ -113,6 +123,10 @@ export const users = [
     department: "IT",
     year: 3,
     semester: 5,
+    batch: "2024-2028",
+    committee: "Event Management",
+    designation: "President",
+    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/dhruvi.jpg",
     isActive: true
   },
@@ -127,12 +141,16 @@ export const users = [
     department: "CE",
     year: 4,
     semester: 7,
+    batch: "2023-2027",
+    committee: "Logistics",
+    designation: "Operations Lead",
+    workingUnder: "Ishika Patel",
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true
   },
 
   // =========================
-  // ADMINS
+  // ADMIN (Exactly ONE Admin)
   // =========================
   {
     id: "AD001",
@@ -144,35 +162,10 @@ export const users = [
     department: "IT",
     year: 3,
     semester: 5,
+    batch: "2024-2028",
+    designation: "Lead Administrator",
+    committee: "TCF Executive",
     profilePhoto: "/assets/images/profile/ishika.jpg",
-    isActive: true
-  },
-
-  {
-    id: "AD002",
-    role: "admin",
-    fullName: "Dhrumi Shah",
-    enrollmentNo: "220130109002",
-    email: "dhrumi@vgec.ac.in",
-    phone: "9876543231",
-    department: "IT",
-    year: 3,
-    semester: 5,
-    profilePhoto: "/assets/images/profile/dhrumi.jpg",
-    isActive: true
-  },
-
-  {
-    id: "AD003",
-    role: "admin",
-    fullName: "Prof. Om Mehta",
-    enrollmentNo: "FAC001",
-    email: "om.mehta@vgec.ac.in",
-    phone: "9876543232",
-    department: "Cyber Security Cell",
-    year: null,
-    semester: null,
-    profilePhoto: "/assets/images/profile/faculty.jpg",
     isActive: true
   }
 ];

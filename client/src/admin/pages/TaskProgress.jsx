@@ -8,7 +8,7 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { events, users } from "../../mockData";
+import { events, users, tasks as initialTasks } from "../../mockData";
 
 function TaskProgress() {
   const volunteers = users.filter(
@@ -23,7 +23,17 @@ function TaskProgress() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showTaskForm, setShowTaskForm] = useState(false);
 
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem("axon_tasks");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return initialTasks || [];
+  });
 
   const [taskName, setTaskName] = useState("");
   const [taskEvent, setTaskEvent] = useState("");

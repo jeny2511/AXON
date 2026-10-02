@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { users } from "../../mockData";
+import { logout } from "../../services/authService";
 
 const menuItems = [
   {
@@ -263,9 +264,9 @@ function Sidebar({ isOpen, onClose }) {
           <button
             type="button"
             onClick={() => {
-              localStorage.removeItem("axon_volunteer_user");
+              logout();
               if (onClose) onClose();
-              navigate("/volunteer/login");
+              navigate("/login");
             }}
             className="mt-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-[12px] text-purple-100 transition-colors hover:bg-[#302263]"
           >

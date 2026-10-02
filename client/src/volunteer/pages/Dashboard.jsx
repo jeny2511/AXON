@@ -9,60 +9,7 @@ import {
   Clock,
   Calendar,
 } from "lucide-react";
-
-const stats = [
-  {
-    title: "Total Events",
-    value: "24",
-    subtext: "8 upcoming events",
-    icon: CalendarDays,
-  },
-  {
-    title: "Total Volunteers",
-    value: "128",
-    subtext: "12 added this month",
-    icon: Users,
-  },
-  {
-    title: "Total Participants",
-    value: "640",
-    subtext: "Across all events",
-    icon: GraduationCap,
-  },
-  {
-    title: "Average Attendance",
-    value: "82%",
-    subtext: "↑ 6.4% from last month",
-    icon: ClipboardCheck,
-  },
-];
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "Web Development Workshop",
-    date: "15 Sep 2026",
-    time: "10:00 AM",
-    registered: 78,
-    status: "Upcoming",
-  },
-  {
-    id: 2,
-    title: "Cybersecurity Awareness Session",
-    date: "22 Sep 2026",
-    time: "02:00 PM",
-    registered: 64,
-    status: "Upcoming",
-  },
-  {
-    id: 3,
-    title: "Capture The Flag (CTF)",
-    date: "08 Oct 2026",
-    time: "09:00 AM",
-    registered: 52,
-    status: "Upcoming",
-  },
-];
+import { events, users, registrations, attendances } from "../../mockData";
 
 const quickAccessItems = [
   {
@@ -92,6 +39,70 @@ const quickAccessItems = [
 ];
 
 function Dashboard() {
+  const totalEventsCount = events.length;
+  const upcomingEventsCount = events.filter((e) => e.status === "upcoming").length;
+  const totalVolunteersCount = users.filter((u) => u.role === "volunteer").length;
+  const totalStudentsCount = users.filter((u) => u.role === "student").length;
+  const totalRegistrationsCount = registrations.filter((r) => r.status === "registered").length;
+
+  const avgAttendancePercent =
+    totalRegistrationsCount > 0
+      ? Math.round((attendances.length / totalRegistrationsCount) * 100)
+      : 85;
+
+  const stats = [
+    {
+      title: "Total Events",
+      value: String(totalEventsCount),
+      subtext: `${upcomingEventsCount} upcoming events`,
+      icon: CalendarDays,
+    },
+    {
+      title: "Active Volunteers",
+      value: String(totalVolunteersCount),
+      subtext: "Assigned to active committees",
+      icon: Users,
+    },
+    {
+      title: "Registered Students",
+      value: String(totalStudentsCount),
+      subtext: `${totalRegistrationsCount} total event registrations`,
+      icon: GraduationCap,
+    },
+    {
+      title: "Attendance Rate",
+      value: `${avgAttendancePercent}%`,
+      subtext: `${attendances.length} verified attendances`,
+      icon: ClipboardCheck,
+    },
+  ];
+
+  const upcomingList = events
+    .filter((e) => e.status === "upcoming")
+    .slice(0, 4)
+    .map((event) => {
+      const eventRegCount = registrations.filter(
+        (r) => r.eventId === event.id && r.status === "registered"
+      ).length;
+
+      const dateDisplay = event.eventDate
+        ? new Date(`${event.eventDate}T00:00:00`).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })
+        : "TBD";
+
+      return {
+        id: event.id,
+        title: event.eventName,
+        date: dateDisplay,
+        time: event.startTime ? `${event.startTime} - ${event.endTime}` : "10:00 AM",
+        registered: eventRegCount,
+        status: "Upcoming",
+      };
+    });
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -159,49 +170,55 @@ function Dashboard() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {upcomingEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex flex-col gap-3 rounded-xl p-3 transition hover:bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7040d0]">
-                    <CalendarDays size={20} />
-                  </div>
+            {upcomingList.length === 0 ? (
+              <p className="text-xs text-gray-400 py-6 text-center">
+                No upcoming events scheduled at this moment.
+              </p>
+            ) : (
+              upcomingList.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex flex-col gap-3 rounded-xl p-3 transition hover:bg-gray-50/80 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7040d0]">
+                      <CalendarDays size={20} />
+                    </div>
 
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-800">
-                      {event.title}
-                    </h3>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
-                      <span className="inline-flex items-center gap-1">
-                        <Calendar size={13} />
-                        {event.date}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock size={13} />
-                        {event.time}
-                      </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-800">
+                        {event.title}
+                      </h3>
+                      <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar size={13} />
+                          {event.date}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={13} />
+                          {event.time}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4 pl-14 sm:pl-0">
-                  <div className="text-right">
-                    <span className="block text-sm font-bold text-gray-800">
-                      {event.registered}
-                    </span>
-                    <span className="block text-[10px] text-gray-400">
-                      Registered
+                  <div className="flex items-center justify-between sm:justify-end gap-4 pl-14 sm:pl-0">
+                    <div className="text-right">
+                      <span className="block text-sm font-bold text-gray-800">
+                        {event.registered}
+                      </span>
+                      <span className="block text-[10px] text-gray-400">
+                        Registered
+                      </span>
+                    </div>
+
+                    <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600">
+                      {event.status}
                     </span>
                   </div>
-
-                  <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600">
-                    {event.status}
-                  </span>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

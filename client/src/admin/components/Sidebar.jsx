@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -15,6 +15,7 @@ import {
   LogOut,
   X,
 } from "lucide-react";
+import { logout } from "../../services/authService";
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/admin" },
@@ -31,6 +32,14 @@ const menuItems = [
 ];
 
 function Sidebar({ isOpen, onClose }) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    if (onClose) onClose();
+    navigate("/login");
+  };
+
   return (
     <aside className={`sidebar ${isOpen ? "sidebar-open" : ""}`}>
       <div className="brand">
@@ -98,7 +107,7 @@ function Sidebar({ isOpen, onClose }) {
 
         <button
           className="nav-item logout"
-          onClick={onClose}
+          onClick={handleLogout}
         >
           <LogOut size={17} strokeWidth={1.8} />
           <span>Logout</span>
