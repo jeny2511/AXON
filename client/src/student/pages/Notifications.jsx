@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./Notifications.css";
 import StudentLayout from "../layouts/StudentLayout";
 import NotificationCard from "../components/NotificationCard/NotificationCard";
@@ -6,6 +6,9 @@ import EmptyState from "../components/EmptyState/EmptyState";
 import {
   getActiveStudentId,
   getStudentNotifications,
+  fetchStudentNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 } from "../services/studentService";
 
 function Notifications() {
@@ -14,26 +17,41 @@ function Notifications() {
     getStudentNotifications(studentId)
   );
 
+  useEffect(() => {
+    fetchStudentNotifications().then((list) => {
+      if (Array.isArray(list)) setNotificationList(list);
+    });
+
+    const handleSync = () => {
+      setNotificationList(getStudentNotifications(studentId));
+    };
+    window.addEventListener("axon-notifications-change", handleSync);
+    return () => window.removeEventListener("axon-notifications-change", handleSync);
+  }, [studentId]);
+
   const handleMarkAsRead = (notificationId) => {
+    markNotificationRead(notificationId);
     setNotificationList((currentNotifications) =>
       currentNotifications.map((notification) =>
-        notification.notificationId === notificationId
-          ? { ...notification, isRead: true }
+        (notification.notificationId === notificationId || notification._id === notificationId || notification.id === notificationId)
+          ? { ...notification, isRead: true, read: true }
           : notification
       )
     );
   };
 
   const handleMarkAllAsRead = () => {
+    markAllNotificationsRead();
     setNotificationList((currentNotifications) =>
       currentNotifications.map((notification) => ({
         ...notification,
         isRead: true,
+        read: true,
       }))
     );
   };
 
-  const unreadCount = notificationList.filter((n) => !n.isRead).length;
+  const unreadCount = notificationList.filter((n) => !n.isRead && !n.read).length;
 
   return (
     <StudentLayout>

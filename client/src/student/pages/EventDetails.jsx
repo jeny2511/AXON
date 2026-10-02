@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import StudentLayout from "../layouts/StudentLayout";
 import "./pages.css";
@@ -10,6 +10,8 @@ import {
   isStudentRegistered,
   checkRegistrationEligibility,
   registerStudentForEvent,
+  fetchEvents,
+  fetchStudentRegistrations,
 } from "../services/studentService";
 
 function EventDetails() {
@@ -23,6 +25,22 @@ function EventDetails() {
     department: "IT",
     year: 3,
   };
+
+  const [, setSyncTick] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().then(() => setSyncTick((t) => t + 1));
+    if (studentId) {
+      fetchStudentRegistrations(studentId).then(() => setSyncTick((t) => t + 1));
+    }
+    const handleSync = () => setSyncTick((t) => t + 1);
+    window.addEventListener("axon-events-change", handleSync);
+    window.addEventListener("axon-registrations-change", handleSync);
+    return () => {
+      window.removeEventListener("axon-events-change", handleSync);
+      window.removeEventListener("axon-registrations-change", handleSync);
+    };
+  }, [studentId]);
 
   const event = getEventById(eventId || "EV001");
   const [statusMessage, setStatusMessage] = useState("");
@@ -48,10 +66,10 @@ function EventDetails() {
     );
   }
 
-  const alreadyRegistered = student?.id ? isStudentRegistered(student.id, event.id) : false;
+  const alreadyRegistered = student?.id ? isStudentRegistered(student.id, event.id || event._id) : false;
   const eligibility = student ? checkRegistrationEligibility(event, student) : { eligible: false, reason: "Login required." };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!studentId) {
       navigate(`/login?redirect=${encodeURIComponent(`/events/${event.id}`)}`);
       return;
@@ -62,8 +80,17 @@ function EventDetails() {
       return;
     }
 
-    registerStudentForEvent(student.id, event.id);
-    setStatusMessage("You have successfully registered! Your attendance QR token is ready.");
+    try {
+      const evId = event.id || event._id;
+      const res = await registerStudentForEvent(student.id, evId);
+      if (res && res.message) {
+        setStatusMessage(res.message);
+      } else {
+        setStatusMessage("You have successfully registered! Your attendance QR token is ready.");
+      }
+    } catch (err) {
+      setStatusMessage(err.message || "Failed to register for event.");
+    }
   };
 
   return (

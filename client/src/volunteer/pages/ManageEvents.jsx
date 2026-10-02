@@ -30,13 +30,20 @@ import { events as mockEvents } from "../../mockData";
 const eventService = {
   // Fetch all events from API/mockData
   getAllEvents: () => {
+    const cached = localStorage.getItem("axon_live_events");
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
     return [...mockEvents];
   },
 
   // Create a new event (supports 'upcoming' or 'draft' status)
   createEvent: (newEventData, existingList, targetStatus = "upcoming") => {
     const generatedId = `EV${String(existingList.length + 1).padStart(3, "0")}`;
-    return {
+    const newEvent = {
       ...newEventData,
       id: generatedId,
       status: targetStatus,
@@ -45,11 +52,17 @@ const eventService = {
       certificateAvailable: false,
       feedbackRequired: true,
     };
+    const updated = [newEvent, ...existingList];
+    try {
+      localStorage.setItem("axon_live_events", JSON.stringify(updated));
+      window.dispatchEvent(new Event("axon-events-change"));
+    } catch {}
+    return newEvent;
   },
 
   // Update an existing event by ID
   updateEvent: (eventId, updatedData, existingList) => {
-    return existingList.map((ev) =>
+    const updated = existingList.map((ev) =>
       ev.id === eventId
         ? {
             ...ev,
@@ -58,11 +71,21 @@ const eventService = {
           }
         : ev
     );
+    try {
+      localStorage.setItem("axon_live_events", JSON.stringify(updated));
+      window.dispatchEvent(new Event("axon-events-change"));
+    } catch {}
+    return updated;
   },
 
   // Remove an event by ID
   deleteEvent: (eventId, existingList) => {
-    return existingList.filter((ev) => ev.id !== eventId);
+    const remaining = existingList.filter((ev) => ev.id !== eventId);
+    try {
+      localStorage.setItem("axon_live_events", JSON.stringify(remaining));
+      window.dispatchEvent(new Event("axon-events-change"));
+    } catch {}
+    return remaining;
   },
 };
 
@@ -165,7 +188,8 @@ function ManageEvents() {
     attendanceOpen: "",
     attendanceClose: "",
     participantLimit: 100,
-    poster: "", // Uploaded poster filename / preview URL
+    poster: "", // Uploaded poster Data URL / URL
+    posterName: "", // Uploaded poster filename
     rulebook: "", // Uploaded rulebook PDF filename
     // Individual Year + Department combinations (starts empty, user selects as needed)
     eligibleCombinations: [],
@@ -289,6 +313,7 @@ function ManageEvents() {
       attendanceClose: event.attendanceClose || "",
       participantLimit: event.participantLimit || 100,
       poster: event.poster || "",
+      posterName: event.posterName || (event.poster ? "Attached Poster" : ""),
       rulebook: event.rulebook || "",
       eligibleCombinations: initialCombos,
     });
@@ -300,11 +325,15 @@ function ManageEvents() {
   const handlePosterUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Stores filename or temporary object URL for preview
-      setFormData((prev) => ({
-        ...prev,
-        poster: file.name,
-      }));
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        setFormData((prev) => ({
+          ...prev,
+          poster: uploadEvent.target?.result || "",
+          posterName: file.name,
+        }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -1173,7 +1202,7 @@ function ManageEvents() {
                   <label className="flex items-center gap-2 px-3 py-2 bg-white border border-dashed border-gray-300 hover:border-[#7040d0] rounded-lg cursor-pointer transition-colors text-xs text-gray-600">
                     <Image size={16} className="text-[#7040d0] shrink-0" />
                     <span className="truncate flex-1">
-                      {formData.poster || "Choose image file (PNG, JPG)..."}
+                      {formData.posterName || (formData.poster ? "Poster Image Selected" : "Choose image file (PNG, JPG)...")}
                     </span>
                     <input
                       type="file"
@@ -1184,7 +1213,7 @@ function ManageEvents() {
                   </label>
                   {formData.poster && (
                     <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-medium">
-                      ✓ Selected: {formData.poster}
+                      ✓ Selected: {formData.posterName || "Image file selected"}
                     </p>
                   )}
                 </div>

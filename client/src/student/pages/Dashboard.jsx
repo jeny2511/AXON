@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import StudentLayout from "../layouts/StudentLayout";
 import EventCard from "../components/EventCard/EventCard";
@@ -7,6 +8,10 @@ import {
   getActiveStudentId,
   getDashboardStats,
   getNearestUpcomingEvent,
+  fetchEvents,
+  fetchStudentRegistrations,
+  fetchStudentAttendance,
+  fetchStudentCertificates,
 } from "../services/studentService";
 
 import "./pages.css";
@@ -15,6 +20,29 @@ import "./Dashboard.css";
 function Dashboard() {
   const navigate = useNavigate();
   const studentId = getActiveStudentId();
+  const [, setSyncTick] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().catch(() => {});
+    if (studentId) {
+      fetchStudentRegistrations(studentId).then(() => setSyncTick((t) => t + 1));
+      fetchStudentAttendance(studentId).then(() => setSyncTick((t) => t + 1));
+      fetchStudentCertificates(studentId).then(() => setSyncTick((t) => t + 1));
+    }
+
+    const handleSync = () => setSyncTick((t) => t + 1);
+    window.addEventListener("axon-events-change", handleSync);
+    window.addEventListener("axon-registrations-change", handleSync);
+    window.addEventListener("axon-attendance-change", handleSync);
+    window.addEventListener("axon-certificates-change", handleSync);
+
+    return () => {
+      window.removeEventListener("axon-events-change", handleSync);
+      window.removeEventListener("axon-registrations-change", handleSync);
+      window.removeEventListener("axon-attendance-change", handleSync);
+      window.removeEventListener("axon-certificates-change", handleSync);
+    };
+  }, [studentId]);
 
   const stats = getDashboardStats(studentId);
   const nearestEvent = getNearestUpcomingEvent();

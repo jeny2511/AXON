@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   X,
@@ -14,6 +14,9 @@ import {
   getActiveStudentId,
   getStudentProfile,
   getStudentCertificates,
+  fetchStudentCertificates,
+  fetchStudentAttendance,
+  fetchEvents,
   getStudentCompletedEvents,
   getEventById,
 } from "../services/studentService";
@@ -52,6 +55,25 @@ function Certificates() {
     enrollmentNo: "220130107054",
   };
 
+  const [, setSyncKey] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().catch(() => {});
+    fetchStudentCertificates(studentId).then(() => setSyncKey((k) => k + 1));
+    fetchStudentAttendance(studentId).then(() => setSyncKey((k) => k + 1));
+
+    const handleSync = () => setSyncKey((k) => k + 1);
+    window.addEventListener("axon-certificates-change", handleSync);
+    window.addEventListener("axon-attendance-change", handleSync);
+    window.addEventListener("axon-events-change", handleSync);
+
+    return () => {
+      window.removeEventListener("axon-certificates-change", handleSync);
+      window.removeEventListener("axon-attendance-change", handleSync);
+      window.removeEventListener("axon-events-change", handleSync);
+    };
+  }, [studentId]);
+
   const certificates = getStudentCertificates(studentId);
   const attendedEvents = getStudentCompletedEvents(studentId);
 
@@ -62,7 +84,7 @@ function Certificates() {
     if (!searchTerm.trim()) return certificates;
     const term = searchTerm.toLowerCase();
     return certificates.filter((cert) => {
-      const event = getEventById(cert.eventId);
+      const event = cert.event || getEventById(cert.eventId);
       const titleMatch = cert.certificateTitle?.toLowerCase().includes(term);
       const idMatch = cert.certificateId?.toLowerCase().includes(term);
       const eventMatch = event?.name?.toLowerCase().includes(term);
@@ -71,7 +93,7 @@ function Certificates() {
   }, [certificates, searchTerm]);
 
   const handleViewCertificate = (certificate) => {
-    const event = getEventById(certificate.eventId);
+    const event = certificate.event || getEventById(certificate.eventId);
     setSelectedCertificate({
       ...certificate,
       eventName: event ? event.name : certificate.eventId,
@@ -170,7 +192,7 @@ function Certificates() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredCertificates.map((certificate) => {
-              const event = getEventById(certificate.eventId);
+              const event = certificate.event || getEventById(certificate.eventId);
 
               return (
                 <div

@@ -3,7 +3,9 @@ import StudentLayout from "../layouts/StudentLayout";
 import {
   getActiveStudentId,
   getStudentProfile,
+  fetchStudentProfile,
   updateStudentProfile,
+  changeStudentPassword,
 } from "../services/studentService";
 import {
   isLoggedIn,
@@ -49,6 +51,17 @@ function Profile() {
   const studentsList = mockUsers.filter((u) => u.role === "student");
 
   useEffect(() => {
+    fetchStudentProfile().then((profile) => {
+      if (profile) {
+        setStudent(profile);
+        setFormData({
+          fullName: profile.fullName || "",
+          email: profile.email || "",
+          phone: profile.phoneNumber || profile.phone || "",
+        });
+      }
+    });
+
     const handleAuthChange = () => {
       const isAuth = isLoggedIn();
       const currentId = getActiveStudentId();
@@ -60,13 +73,17 @@ function Profile() {
         setFormData({
           fullName: profile.fullName || "",
           email: profile.email || "",
-          phone: profile.phone || "",
+          phone: profile.phoneNumber || profile.phone || "",
         });
       }
     };
 
     window.addEventListener("axon-auth-change", handleAuthChange);
-    return () => window.removeEventListener("axon-auth-change", handleAuthChange);
+    window.addEventListener("axon-profile-change", handleAuthChange);
+    return () => {
+      window.removeEventListener("axon-auth-change", handleAuthChange);
+      window.removeEventListener("axon-profile-change", handleAuthChange);
+    };
   }, []);
 
   const handleChange = (event) => {
@@ -77,22 +94,26 @@ function Profile() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.fullName.trim() || !formData.email.trim()) {
       setMessage({ type: "error", text: "Name and email are required fields." });
       return;
     }
 
-    const updated = updateStudentProfile(studentId, {
-      fullName: formData.fullName.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-    });
+    try {
+      const updated = await updateStudentProfile(studentId, {
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+      });
 
-    setStudent(updated);
-    setIsEditing(false);
-    setMessage({ type: "success", text: "Profile details updated successfully!" });
-    setTimeout(() => setMessage(null), 4000);
+      setStudent(updated);
+      setIsEditing(false);
+      setMessage({ type: "success", text: "Profile details updated successfully!" });
+      setTimeout(() => setMessage(null), 4000);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to update profile." });
+    }
   };
 
   const handleCancelEdit = () => {
@@ -100,7 +121,7 @@ function Profile() {
       setFormData({
         fullName: student.fullName || "",
         email: student.email || "",
-        phone: student.phone || "",
+        phone: student.phoneNumber || student.phone || "",
       });
     }
     setIsEditing(false);
@@ -114,7 +135,7 @@ function Profile() {
     }));
   };
 
-  const handlePasswordUpdate = () => {
+  const handlePasswordUpdate = async () => {
     if (
       !passwordData.currentPassword ||
       !passwordData.newPassword ||
@@ -134,16 +155,24 @@ function Profile() {
       return;
     }
 
-    setMessage({ type: "success", text: "Account password updated successfully!" });
-    setTimeout(() => setMessage(null), 4000);
+    try {
+      await changeStudentPassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
+      setMessage({ type: "success", text: "Account password updated successfully!" });
+      setTimeout(() => setMessage(null), 4000);
 
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
 
-    setShowPasswordForm(false);
+      setShowPasswordForm(false);
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to change password." });
+    }
   };
 
   const handleGuestLoginSubmit = (e) => {

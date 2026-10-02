@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -13,6 +13,7 @@ import {
 import StudentLayout from "../layouts/StudentLayout";
 import {
   getOngoingEvents,
+  fetchEvents,
 } from "../services/studentService";
 import { filterEventsBySearch } from "../utils/filterEvents";
 
@@ -46,6 +47,15 @@ function OngoingEvents() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("search") || "";
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  const [, setEventTick] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().then(() => setEventTick((t) => t + 1)).catch(() => {});
+    const handleChange = () => setEventTick((t) => t + 1);
+    window.addEventListener("axon-events-change", handleChange);
+    return () => window.removeEventListener("axon-events-change", handleChange);
+  }, []);
 
   const allOngoing = getOngoingEvents();
   const filteredEvents = filterEventsBySearch(allOngoing, searchTerm);

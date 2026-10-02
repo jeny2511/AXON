@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -14,6 +14,7 @@ import {
 import StudentLayout from "../layouts/StudentLayout";
 import {
   getUpcomingEvents,
+  fetchEvents,
   getActiveStudentId,
   getStudentProfile,
   isStudentRegistered,
@@ -94,6 +95,15 @@ function UpcomingEvents() {
     department: "IT",
     year: 3,
   };
+
+  const [, setEventTick] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().then(() => setEventTick((t) => t + 1)).catch(() => {});
+    const handleEventsChange = () => setEventTick((t) => t + 1);
+    window.addEventListener("axon-events-change", handleEventsChange);
+    return () => window.removeEventListener("axon-events-change", handleEventsChange);
+  }, []);
 
   const allUpcoming = getUpcomingEvents();
   const filteredEvents = filterEventsBySearch(allUpcoming, searchTerm);

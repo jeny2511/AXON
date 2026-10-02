@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import "./pages.css";
 import "./MyEvents.css";
 
@@ -22,12 +22,18 @@ import {
   getActiveStudentId,
   getStudentProfile,
   getStudentRegistrations,
+  fetchStudentRegistrations,
+  fetchStudentAttendance,
+  fetchStudentCertificates,
+  fetchEvents,
   getEventById,
   getStudentAttendanceForEvent,
   getStudentCertificateForEvent,
   hasSubmittedFeedback,
   submitStudentFeedback,
   getEventFeedbackForm,
+  fetchEventFeedbackForm,
+  fetchStudentFeedbackSubmissions,
 } from "../services/studentService";
 
 // Format date string into "DD MMM YYYY"
@@ -64,11 +70,36 @@ function MyEvents() {
     enrollmentNo: "220130107054",
   };
 
+  const [, setSyncTick] = useState(0);
+
+  useEffect(() => {
+    fetchEvents().catch(() => {});
+    fetchStudentRegistrations(studentId).then(() => setSyncTick((t) => t + 1));
+    fetchStudentAttendance(studentId).then(() => setSyncTick((t) => t + 1));
+    fetchStudentCertificates(studentId).then(() => setSyncTick((t) => t + 1));
+    fetchStudentFeedbackSubmissions().then(() => setSyncTick((t) => t + 1));
+
+    const handleSync = () => setSyncTick((t) => t + 1);
+    window.addEventListener("axon-registrations-change", handleSync);
+    window.addEventListener("axon-attendance-change", handleSync);
+    window.addEventListener("axon-certificates-change", handleSync);
+    window.addEventListener("axon-events-change", handleSync);
+    window.addEventListener("axon-feedback-change", handleSync);
+
+    return () => {
+      window.removeEventListener("axon-registrations-change", handleSync);
+      window.removeEventListener("axon-attendance-change", handleSync);
+      window.removeEventListener("axon-certificates-change", handleSync);
+      window.removeEventListener("axon-events-change", handleSync);
+      window.removeEventListener("axon-feedback-change", handleSync);
+    };
+  }, [studentId]);
+
   const registrations = getStudentRegistrations(studentId);
 
   const myEvents = registrations
     .map((registration) => {
-      const event = getEventById(registration.eventId);
+      const event = registration.event || getEventById(registration.eventId);
       if (!event) return null;
       return {
         ...event,
@@ -104,7 +135,8 @@ function MyEvents() {
 
   // Open Certificate for specific event
   const handleCertificate = (event) => {
-    const cert = getStudentCertificateForEvent(student.id, event.id);
+    const evId = event.id || event._id;
+    const cert = getStudentCertificateForEvent(student.id, evId);
     if (cert) {
       setSelectedCertificate({
         ...cert,
@@ -121,11 +153,12 @@ function MyEvents() {
   // Open Feedback Modal for specific event
   const handleFeedback = (event) => {
     setSelectedFeedbackEvent(event);
-    const alreadyDone = hasSubmittedFeedback(student.id, event.id);
+    const evId = event.id || event._id;
+    const alreadyDone = hasSubmittedFeedback(student.id, evId);
     setFeedbackSubmitted(alreadyDone);
     setFeedbackError("");
 
-    const formConfig = getEventFeedbackForm(event.id);
+    const formConfig = getEventFeedbackForm(evId);
     const qs = formConfig?.questions || [];
     setFeedbackQuestions(qs);
 
@@ -134,9 +167,28 @@ function MyEvents() {
       initialAnswers[q.id] = q.type === "checkbox" ? [] : "";
     });
     setFeedbackAnswers(initialAnswers);
+
+    // Fetch live backend form questions & submission status asynchronously
+    fetchEventFeedbackForm(evId)
+      .then((liveForm) => {
+        if (liveForm) {
+          if (liveForm.hasSubmitted) {
+            setFeedbackSubmitted(true);
+          }
+          if (Array.isArray(liveForm.questions) && liveForm.questions.length > 0) {
+            setFeedbackQuestions(liveForm.questions);
+            const liveAnswers = {};
+            liveForm.questions.forEach((q) => {
+              liveAnswers[q.id] = q.type === "checkbox" ? [] : "";
+            });
+            setFeedbackAnswers((prev) => ({ ...liveAnswers, ...prev }));
+          }
+        }
+      })
+      .catch(() => {});
   };
 
-  const handleFeedbackSubmit = (e) => {
+  const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
 
     if (feedbackQuestions.length === 0) {
@@ -160,10 +212,15 @@ function MyEvents() {
       }
     }
 
-    submitStudentFeedback(student.id, selectedFeedbackEvent.id, feedbackAnswers);
-
-    setFeedbackError("");
-    setFeedbackSubmitted(true);
+    const evId = selectedFeedbackEvent.id || selectedFeedbackEvent._id;
+    try {
+      await submitStudentFeedback(student.id, evId, feedbackAnswers);
+      setFeedbackError("");
+      setFeedbackSubmitted(true);
+      fetchStudentCertificates(student.id).catch(() => {});
+    } catch (err) {
+      setFeedbackError(err.message || "Failed to submit feedback.");
+    }
   };
 
   const closeFeedback = () => {
@@ -234,11 +291,12 @@ function MyEvents() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredEvents.map((event) => {
-              const attRecord = getStudentAttendanceForEvent(student.id, event.id);
+              const evId = event.id || event._id;
+              const attRecord = getStudentAttendanceForEvent(student.id, evId);
               const attendanceStatus = attRecord ? attRecord.status : "pending";
-              const cert = getStudentCertificateForEvent(student.id, event.id);
+              const cert = getStudentCertificateForEvent(student.id, evId);
               const isPresent = attendanceStatus === "present";
-              const feedbackDone = hasSubmittedFeedback(student.id, event.id);
+              const feedbackDone = hasSubmittedFeedback(student.id, evId);
 
               return (
                 <div

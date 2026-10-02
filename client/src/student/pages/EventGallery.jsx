@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import StudentLayout from "../layouts/StudentLayout";
-import { getGallery } from "../services/studentService";
+import { getGallery, fetchGallery } from "../services/studentService";
 
 // Format date helper
 function formatDate(dateStr) {
@@ -26,10 +26,24 @@ function formatDate(dateStr) {
 }
 
 function EventGallery() {
-  const galleries = getGallery();
+  const [galleries, setGalleries] = useState(getGallery());
   const [search, setSearch] = useState("");
   const [selectedGallery, setSelectedGallery] = useState(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    fetchGallery().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setGalleries(data);
+      }
+    });
+
+    const handleSync = () => {
+      setGalleries(getGallery());
+    };
+    window.addEventListener("axon-gallery-change", handleSync);
+    return () => window.removeEventListener("axon-gallery-change", handleSync);
+  }, []);
 
   const filteredGalleries = useMemo(() => {
     if (!search.trim()) return galleries;
