@@ -6,7 +6,7 @@ import mongoose from "mongoose";
  */
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGO_URI;
+    const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI;
 
     if (!mongoURI || mongoURI.includes("<username>") || mongoURI.includes("placeholder")) {
       console.warn(
