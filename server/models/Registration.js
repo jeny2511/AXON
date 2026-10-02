@@ -1,16 +1,65 @@
 import mongoose from "mongoose";
 
 /**
- * Registration Model Schema
- * Assigned to: Preyas
+ * Event Registration Model Schema
+ * Source of Truth Section 13, 14, 24:
+ * - Resolves STUDENT N:M EVENT relationship.
+ * - Essential Rule: Registration is NOT attendance! (Registered != Attended).
+ * - Enforces exactly ONE registration per student per event.
+ * - Soft-delete enabled.
  */
 const registrationSchema = new mongoose.Schema(
   {
-    // Schema fields to be implemented by Preyas
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Student reference is required"],
+      index: true,
+    },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event",
+      required: [true, "Event reference is required"],
+      index: true,
+    },
+    registeredAt: {
+      type: Date,
+      default: Date.now,
+    },
+    status: {
+      type: String,
+      enum: ["registered", "cancelled"],
+      default: "registered",
+    },
+    cancellationReason: {
+      type: String,
+      default: "",
+    },
+    // Soft Delete (Section 18)
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
+);
+
+// Enforce ONE registration per student per event for active registrations
+registrationSchema.index(
+  { studentId: 1, eventId: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } }
 );
 
 const Registration = mongoose.model("Registration", registrationSchema);
