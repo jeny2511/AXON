@@ -48,41 +48,64 @@ export function hasRole(role) {
   return currentRole === role;
 }
 
-// Centralized Login function for all three roles
-export function loginUser(identifier, password, preferredRole = null) {
-  if (!identifier || !identifier.trim()) {
-    throw new Error("Enrollment Number, Email, or User ID is required.");
+// Centralized Login function for all three roles (accepts identifier or { enrollmentNo, email, password })
+export function loginUser(credentialsOrIdentifier, password = "", preferredRole = null) {
+  let enrollmentInput = "";
+  let emailInput = "";
+  let passInput = password;
+
+  if (typeof credentialsOrIdentifier === "object" && credentialsOrIdentifier !== null) {
+    enrollmentInput = (credentialsOrIdentifier.enrollmentNo || credentialsOrIdentifier.enrollmentNumber || "").trim().toLowerCase();
+    emailInput = (credentialsOrIdentifier.email || credentialsOrIdentifier.emailId || "").trim().toLowerCase();
+    passInput = credentialsOrIdentifier.password || passInput || "";
+    if (credentialsOrIdentifier.role) preferredRole = credentialsOrIdentifier.role;
+  } else if (typeof credentialsOrIdentifier === "string") {
+    const raw = credentialsOrIdentifier.trim().toLowerCase();
+    if (raw.includes("@")) {
+      emailInput = raw;
+    } else {
+      enrollmentInput = raw;
+    }
   }
 
-  const query = identifier.trim().toLowerCase();
+  if (!enrollmentInput && !emailInput) {
+    throw new Error("Please enter your Enrollment Number or Email ID.");
+  }
+
   const allUsers = getAllUsers();
 
-  // Find user by id, email, enrollmentNo, or fullName
+  // Find user by enrollmentNo, email, or id
   let matchedUser = allUsers.find((u) => {
-    const idMatch = u.id && u.id.toLowerCase() === query;
-    const emailMatch = u.email && u.email.toLowerCase() === query;
-    const enrollMatch = u.enrollmentNo && u.enrollmentNo.toLowerCase() === query;
-    const nameMatch = u.fullName && u.fullName.toLowerCase() === query;
+    const uEnroll = (u.enrollmentNo || "").toLowerCase();
+    const uEmail = (u.email || "").toLowerCase();
+    const uId = (u.id || "").toLowerCase();
 
-    if (preferredRole) {
-      return u.role === preferredRole && (idMatch || emailMatch || enrollMatch || nameMatch);
+    // If both inputs were provided, match either or both
+    if (enrollmentInput && emailInput) {
+      if (uEnroll === enrollmentInput && uEmail === emailInput) return true;
+      if (uEnroll === enrollmentInput || uEmail === emailInput) return true;
+    } else if (enrollmentInput) {
+      if (uEnroll === enrollmentInput || uId === enrollmentInput) return true;
+    } else if (emailInput) {
+      if (uEmail === emailInput) return true;
     }
-    return idMatch || emailMatch || enrollMatch || nameMatch;
+    return false;
   });
 
-  // If no exact match but preferredRole is specified, try fallback to first user of that role for demo testing
-  if (!matchedUser && preferredRole) {
-    const roleUsers = allUsers.filter((u) => u.role === preferredRole);
-    if (roleUsers.length > 0 && query.length >= 2) {
-      matchedUser = roleUsers.find((u) =>
-        u.fullName.toLowerCase().includes(query) ||
-        u.email.toLowerCase().includes(query)
+  // Fallback for admin or demo users if exact match fails
+  if (!matchedUser) {
+    const query = enrollmentInput || emailInput;
+    matchedUser = allUsers.find((u) => {
+      return (
+        (u.fullName && u.fullName.toLowerCase().includes(query)) ||
+        (u.id && u.id.toLowerCase() === query) ||
+        (u.email && u.email.toLowerCase() === query)
       );
-    }
+    });
   }
 
   if (!matchedUser) {
-    throw new Error("Invalid credentials. Please check your details or contact Administrator.");
+    throw new Error("Invalid credentials. Please verify your Enrollment Number or Email ID.");
   }
 
   // Set centralized session
@@ -93,6 +116,8 @@ export function loginUser(identifier, password, preferredRole = null) {
     localStorage.setItem(AUTH_STUDENT_KEY, matchedUser.id);
   } else if (matchedUser.role === "volunteer") {
     localStorage.setItem(AUTH_VOLUNTEER_KEY, JSON.stringify(matchedUser));
+  } else if (matchedUser.role === "admin") {
+    localStorage.setItem("axon_admin_user", JSON.stringify(matchedUser));
   }
 
   window.dispatchEvent(new Event("axon-auth-change"));
@@ -104,31 +129,50 @@ export function registerStudent(studentData) {
   if (!studentData.fullName || !studentData.fullName.trim()) {
     throw new Error("Full name is required.");
   }
+  if (!studentData.enrollmentNo || !studentData.enrollmentNo.trim()) {
+    throw new Error("Enrollment number is required.");
+  }
   if (!studentData.email || !studentData.email.trim()) {
     throw new Error("College email address is required.");
   }
 
   const allUsers = getAllUsers();
+  const trimmedEnroll = studentData.enrollmentNo.trim();
+  const trimmedEmail = studentData.email.trim().toLowerCase();
+
+  // Check if already registered
+  const existingUser = allUsers.find(
+    (u) =>
+      (u.enrollmentNo && u.enrollmentNo.toLowerCase() === trimmedEnroll.toLowerCase()) ||
+      (u.email && u.email.toLowerCase() === trimmedEmail)
+  );
+
+  if (existingUser) {
+    throw new Error("An account with this enrollment number or email already exists. Please sign in.");
+  }
+
   const studentCount = allUsers.filter((u) => u.role === "student").length;
   const newStudentId = `ST${String(studentCount + 1).padStart(3, "0")}`;
 
   const department = studentData.department || "IT";
-  const year = Number(studentData.year) || 1;
+  const courseType = studentData.courseType || studentData.admissionType || "Regular";
+  const year = Number(studentData.year) || (courseType === "D2D" ? 2 : 1);
   const semester = Number(studentData.semester) || (year * 2 - 1);
-  const startYear = 2026 - year + 1;
-  const batch = studentData.batch || `${startYear}-${startYear + 4}`;
+  const batch = studentData.batch || "2024-2028";
 
   const newStudent = {
     id: newStudentId,
     studentId: newStudentId,
     role: "student",
     fullName: studentData.fullName.trim(),
-    email: studentData.email.trim(),
+    email: trimmedEmail,
     department,
+    courseType,
+    admissionType: courseType.toLowerCase(),
     year,
     semester,
-    enrollmentNo: studentData.enrollmentNo?.trim() || `24${department}0${String(studentCount + 1).padStart(2, "0")}`,
-    phone: studentData.phone?.trim() || "9876543210",
+    enrollmentNo: trimmedEnroll,
+    phone: studentData.phone?.trim() || studentData.phoneNumber?.trim() || "9876543210",
     batch,
     profilePhoto: "/assets/images/profile/default.jpg",
     isActive: true,
