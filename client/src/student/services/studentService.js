@@ -4,6 +4,7 @@ import { events as mockEvents } from "../../mockData/events";
 import { registrations as mockRegistrations } from "../../mockData/registrations";
 import { certificates as mockCertificates } from "../../mockData/certificates";
 import { feedback as mockFeedback } from "../../mockData/feedback";
+import { feedbackForms } from "../../mockData/feedbackForms";
 import { gallery as mockGallery } from "../../mockData/gallery";
 import { aboutTCF as mockAboutTCF } from "../../mockData/about";
 import { notifications as mockNotifications } from "../../mockData/notifications";
@@ -313,17 +314,53 @@ export function hasSubmittedFeedback(studentId, eventId) {
   );
 }
 
-export function submitStudentFeedback(studentId, eventId, data) {
+export function getEventFeedbackForm(eventId) {
+  // 1. Check custom forms stored in localStorage from Volunteer module
+  try {
+    const saved = localStorage.getItem("axon_feedback_forms");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const match = parsed.find(
+        (f) =>
+          f.eventId === eventId ||
+          String(f.eventId).toLowerCase() === String(eventId).toLowerCase()
+      );
+      if (match && match.questions && match.questions.length > 0) {
+        return match;
+      }
+    }
+  } catch (e) {
+    console.error("Error loading forms from localStorage:", e);
+  }
+
+  // 2. Fallback to mockData feedbackForms
+  const mockMatch = feedbackForms.find(
+    (f) =>
+      f.eventId === eventId ||
+      String(f.eventId).toLowerCase() === String(eventId).toLowerCase()
+  );
+  if (mockMatch && mockMatch.questions && mockMatch.questions.length > 0) {
+    return mockMatch;
+  }
+
+  return null;
+}
+
+export function submitStudentFeedback(studentId, eventId, answers) {
   const resolvedId = resolveStudentId(studentId);
+  const activeUser = getActiveStudentUser();
+  const student = getStudentProfile(studentId) || {
+    fullName: activeUser?.name || "Student",
+    enrollmentNo: "220130107054",
+    department: "IT",
+    year: 3,
+  };
+
   const feedbackData = {
     feedbackId: `FB_${resolvedId}_${eventId}`,
     studentId: resolvedId,
     eventId,
-    overallRating: Number(data.overallRating),
-    contentRating: Number(data.contentRating),
-    speakerRating: Number(data.speakerRating),
-    comment: (data.comment || "").trim(),
-    wouldRecommend: Boolean(data.wouldRecommend),
+    answers,
     submittedAt: new Date().toISOString(),
     isAnonymous: false,
   };
@@ -336,6 +373,41 @@ export function submitStudentFeedback(studentId, eventId, data) {
     `axon_feedback_${resolvedId}_${eventId}`,
     JSON.stringify(feedbackData)
   );
+
+  // Sync to volunteer feedback responses in localStorage
+  try {
+    const savedForms = localStorage.getItem("axon_feedback_forms");
+    const formsList = savedForms ? JSON.parse(savedForms) : [...feedbackForms];
+    const formIndex = formsList.findIndex(
+      (f) => String(f.eventId).toLowerCase() === String(eventId).toLowerCase()
+    );
+
+    const newResponse = {
+      id: `RESP_${Date.now()}`,
+      name: student.fullName,
+      enrollment: student.enrollmentNo || "220130107054",
+      branch: student.department || "IT",
+      yearSem: student.year ? `${student.year}rd Year` : "3rd Year",
+      answers,
+    };
+
+    if (formIndex >= 0) {
+      if (!formsList[formIndex].responses) {
+        formsList[formIndex].responses = [];
+      }
+      const existingIdx = formsList[formIndex].responses.findIndex(
+        (r) => r.enrollment === newResponse.enrollment
+      );
+      if (existingIdx >= 0) {
+        formsList[formIndex].responses[existingIdx] = newResponse;
+      } else {
+        formsList[formIndex].responses.push(newResponse);
+      }
+    }
+    localStorage.setItem("axon_feedback_forms", JSON.stringify(formsList));
+  } catch (e) {
+    console.error("Error updating volunteer feedback responses:", e);
+  }
 
   return feedbackData;
 }

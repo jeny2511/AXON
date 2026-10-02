@@ -45,12 +45,25 @@ function FeedbackForm() {
   const [showEvents, setShowEvents] = useState(false);
   const searchRef = useRef(null);
 
-  const [forms, setForms] = useState(feedbackForms);
+  const [forms, setForms] = useState(() => {
+    try {
+      const saved = localStorage.getItem("axon_feedback_forms");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return feedbackForms;
+  });
   const [modal, setModal] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [toast, setToast] = useState("");
 
   const [report, setReport] = useState(null);
+
+  // Sync forms to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("axon_feedback_forms", JSON.stringify(forms));
+    } catch (e) {}
+  }, [forms]);
 
   // Close dropdown on outside click
   useEffect(() => {

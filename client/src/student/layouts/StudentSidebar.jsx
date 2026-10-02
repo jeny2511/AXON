@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CalendarDays,
-  ClipboardList,
   CalendarCheck,
   Clock,
   Award,
@@ -28,11 +27,6 @@ const menuItems = [
     name: "Upcoming Events",
     path: "/upcoming-events",
     icon: CalendarDays,
-  },
-  {
-    name: "Registered Events",
-    path: "/registered-events",
-    icon: ClipboardList,
   },
   {
     name: "My Events",

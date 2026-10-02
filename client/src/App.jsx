@@ -7,7 +7,6 @@ import { isLoggedIn, getCurrentUser } from "./services/authService";
 import StudentDashboard from "./student/pages/Dashboard";
 import StudentProfile from "./student/pages/Profile";
 import UpcomingEvents from "./student/pages/UpcomingEvents";
-import RegisteredEvents from "./student/pages/RegisteredEvents";
 import MyEvents from "./student/pages/MyEvents";
 import OngoingEvents from "./student/pages/OngoingEvents";
 import EventDetails from "./student/pages/EventDetails";
@@ -135,11 +134,7 @@ function App() {
       />
       <Route
         path="/registered-events"
-        element={
-          <ProtectedRoute allowedRoles={["student"]}>
-            <RegisteredEvents />
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/my-events" replace />}
       />
       <Route
         path="/my-events"

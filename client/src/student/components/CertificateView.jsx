@@ -1,3 +1,6 @@
+import { useRef, useState } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import "./CertificateView.css";
 
 function CertificateView({
@@ -7,6 +10,9 @@ function CertificateView({
   eventName,
   onClose,
 }) {
+  const certificateRef = useRef(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!certificate) return null;
 
   const formattedDate = certificate.issueDate
@@ -17,8 +23,41 @@ function CertificateView({
       })
     : "Date not available";
 
-  const handleDownload = () => {
-    window.print();
+  const handleDownload = async () => {
+    if (!certificateRef.current || isDownloading) return;
+
+    try {
+      setIsDownloading(true);
+      const element = certificateRef.current;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
+
+      const cleanStudentName = (studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const cleanEventName = (eventName || "Certificate").replace(/[^a-zA-Z0-9_-]/g, "_");
+      pdf.save(`Certificate_${cleanStudentName}_${cleanEventName}.pdf`);
+    } catch (error) {
+      console.error("Error generating certificate PDF:", error);
+      alert("Failed to download certificate. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -30,6 +69,7 @@ function CertificateView({
             type="button"
             className="certificate-close-btn"
             onClick={onClose}
+            disabled={isDownloading}
           >
             ✕ Close
           </button>
@@ -38,13 +78,14 @@ function CertificateView({
             type="button"
             className="certificate-download-btn"
             onClick={handleDownload}
+            disabled={isDownloading}
           >
-            ↓ Download Certificate
+            {isDownloading ? "⏳ Generating PDF..." : "↓ Download Certificate"}
           </button>
         </div>
 
         {/* Certificate */}
-        <div className="certificate-print-area">
+        <div className="certificate-print-area" ref={certificateRef}>
           <div className="certificate-border">
             <div className="certificate-inner-border">
               <div className="certificate-content">
@@ -145,11 +186,6 @@ function CertificateView({
             </div>
           </div>
         </div>
-
-        <p className="certificate-print-note">
-          Click "Download Certificate" and choose <strong>Save as PDF</strong>
-          in the print window.
-        </p>
       </div>
     </div>
   );
