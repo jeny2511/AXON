@@ -168,100 +168,14 @@ function parseQRCodeData(rawText) {
 }
 
 /**
- * Realistic student participant pool based on VGEC enrollment structures
- * (combines mockData users and sample students shown in reference designs)
+ * Realistic student participant pool (empty for live production database)
  */
-const SAMPLE_STUDENT_POOL = [
-  { enrollmentNo: "24IT001", name: "Priyansh Patel", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT002", name: "Jinal Shah", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE015", name: "Meet Desai", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC007", name: "Krisha Vora", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT010", name: "Dhruv Mehta", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107054", name: "Jeny Thesiya", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107055", name: "Archi Patel", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107056", name: "Riya Shah", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107057", name: "Meet Parmar", department: "ICT", year: "4th Year", semester: 7 },
-  { enrollmentNo: "220130107058", name: "Krishna Dave", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107059", name: "Harsh Joshi", department: "CE", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "24IT018", name: "Tanvi Panchal", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE032", name: "Smit Solanki", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC021", name: "Aayush Trivedi", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24ICT009", name: "Nirav Barot", department: "ICT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT025", name: "Khushi Prajapati", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE044", name: "Yash Makwana", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC035", name: "Diya Rathod", department: "EC", year: "2nd Year", semester: 3 },
-];
+const SAMPLE_STUDENT_POOL = [];
+
+const EVENT_REGISTERED_STUDENTS_MAP = {};
 
 /**
- * Event-specific student registration mappings:
- * Each event has its OWN specific registered students based on registrations in AXON.
- * Only students registered for that specific event are shown in that event's sheet!
- */
-const EVENT_REGISTERED_STUDENTS_MAP = {
-  EV001: [
-    "220130107054", // Jeny Thesiya (REG001)
-    "220130107055", // Archi Patel (REG006)
-    "24IT001",      // Priyansh Patel
-    "24IT002",      // Jinal Shah
-    "24CE015",      // Meet Desai
-    "24EC007",      // Krisha Vora
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-  ],
-  EV002: [
-    "220130107054", // Jeny Thesiya (REG002)
-    "220130107059", // Harsh Joshi (REG014)
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-    "24CE032",      // Smit Solanki
-    "24ICT009",     // Nirav Barot
-    "24IT025",      // Khushi Prajapati
-  ],
-  EV003: [
-    "220130107054", // Jeny Thesiya (REG003)
-    "220130107055", // Archi Patel (REG007)
-    "220130107056", // Riya Shah
-    "24CE015",      // Meet Desai
-    "24EC021",      // Aayush Trivedi
-    "24CE044",      // Yash Makwana
-  ],
-  EV004: [
-    "220130107054", // Jeny Thesiya (REG004)
-    "220130107057", // Meet Parmar (REG010)
-    "24IT001",      // Priyansh Patel
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-  EV005: [
-    "220130107054", // Jeny Thesiya (REG005)
-    "220130107056", // Riya Shah (REG009)
-    "24IT002",      // Jinal Shah
-    "24EC007",      // Krisha Vora
-    "24IT025",      // Khushi Prajapati
-    "24CE044",      // Yash Makwana
-  ],
-  EV006: [
-    "220130107057", // Meet Parmar (REG011)
-    "24CE015",      // Meet Desai
-    "24IT018",      // Tanvi Panchal
-    "24ICT009",     // Nirav Barot
-  ],
-  EV007: [
-    "220130107058", // Krishna Dave (REG012)
-    "24IT001",      // Priyansh Patel
-    "24IT010",      // Dhruv Mehta
-    "24EC021",      // Aayush Trivedi
-  ],
-  EV008: [
-    "220130107058", // Krishna Dave (REG013)
-    "24IT002",      // Jinal Shah
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-};
-
-/**
- * Service to simulate backend database operations
+ * Service to handle backend participant registrations
  */
 const registrationService = {
   // Returns all events sorted to prioritize upcoming / ongoing events
@@ -289,11 +203,11 @@ const registrationService = {
 
   // Asynchronously fetch live registered participants from backend API
   fetchParticipants: async (event) => {
-    if (!event) return null;
+    if (!event) return [];
     const targetId = event._id || event.id;
     try {
       const res = await api.get(`/registrations/event/${targetId}/participants`);
-      if (res && res.success && Array.isArray(res.participants) && res.participants.length > 0) {
+      if (res && res.success && Array.isArray(res.participants)) {
         return res.participants.map((p) => {
           const isPresent = p.attendanceStatus === "present" || p.hasAttended;
           return {
@@ -305,65 +219,20 @@ const registrationService = {
             year: p.batch ? `${p.batch} Batch` : (p.year || "3rd Year"),
             semester: p.semester || 5,
             status: isPresent ? "present" : "absent",
-            checkInTime: isPresent ? "10:15 AM" : null,
+            checkInTime: p.attendanceTime ? new Date(p.attendanceTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (isPresent ? "Present" : null),
             qrCode: p.qrCode || `QR-${event.id}-${p.enrollmentNo || p.enrollmentNumber}`,
           };
         });
       }
     } catch (err) {
-      // Fallback cleanly to local participants
+      console.warn("Live fetch participants failed:", err?.message || err);
     }
-    return null;
+    return [];
   },
 
   // Generates or fetches participant roster specifically registered for this event
-  getParticipantsForEvent: (event) => {
-    if (!event) return [];
-
-    // 1. Get the list of enrollment numbers registered specifically for this event
-    let registeredEnrollments = EVENT_REGISTERED_STUDENTS_MAP[event.id];
-
-    if (!registeredEnrollments) {
-      // For any newly created or custom events, filter students matching the event's eligibility
-      registeredEnrollments = SAMPLE_STUDENT_POOL
-        .filter((student) => {
-          const deptMatch =
-            !event.eligibleDepartments ||
-            event.eligibleDepartments.length === 0 ||
-            event.eligibleDepartments.includes(student.department);
-          const yearNum = typeof student.year === "string" ? parseInt(student.year[0]) : student.year;
-          const yearMatch =
-            !event.eligibleYears ||
-            event.eligibleYears.length === 0 ||
-            event.eligibleYears.includes(yearNum);
-          return deptMatch && yearMatch;
-        })
-        .slice(0, event.participantLimit || 8)
-        .map((s) => s.enrollmentNo);
-    }
-
-    // 2. Map ONLY those students registered for this specific event
-    return SAMPLE_STUDENT_POOL
-      .filter((student) => registeredEnrollments.includes(student.enrollmentNo))
-      .map((student, index) => {
-        // Attendance status: First 2-3 are checked in (Present) by default, others Absent
-        const isPresent = index < 3;
-        const randomMinute = 10 + (index * 3);
-        const formattedMin = randomMinute < 10 ? `0${randomMinute}` : randomMinute;
-
-        return {
-          id: `REG-${event.id}-${student.enrollmentNo}`,
-          eventId: event.id,
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
-          department: student.department,
-          year: student.year,
-          semester: student.semester || 3,
-          status: isPresent ? "present" : "absent",
-          checkInTime: isPresent ? `10:${formattedMin} AM` : null,
-          qrCode: `QR-${event.id}-${student.enrollmentNo}`,
-        };
-      });
+  getParticipantsForEvent: () => {
+    return [];
   },
 };
 
@@ -446,33 +315,16 @@ export default function Registrations() {
   // Load participants whenever active event changes
   useEffect(() => {
     if (selectedEvent) {
-      const storageKey = `axon_participants_${selectedEvent.id}`;
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        try {
-          setParticipants(JSON.parse(stored));
-        } catch (e) {
-          console.error("Error parsing stored participants:", e);
-        }
-      } else {
-        const initialRoster = registrationService.getParticipantsForEvent(selectedEvent);
-        setParticipants(initialRoster);
-        try {
-          localStorage.setItem(storageKey, JSON.stringify(initialRoster));
-        } catch (e) {
-          console.error("Error writing initial participants to localStorage:", e);
-        }
-      }
-
       // Live fetch participants from backend API
       registrationService.fetchParticipants(selectedEvent).then((liveRoster) => {
-        if (liveRoster && liveRoster.length > 0) {
-          setParticipants(liveRoster);
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(liveRoster));
-          } catch {}
-        }
+        const list = Array.isArray(liveRoster) ? liveRoster : [];
+        setParticipants(list);
+        try {
+          localStorage.setItem(`axon_participants_${selectedEvent.id}`, JSON.stringify(list));
+        } catch {}
       });
+    } else {
+      setParticipants([]);
     }
   }, [selectedEvent]);
 

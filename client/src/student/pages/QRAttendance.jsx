@@ -5,8 +5,8 @@ import { getActiveStudentId, getStudentProfile, getStudentAttendanceForEvent } f
 function QRAttendance({ event }) {
   const studentId = getActiveStudentId();
   const student = getStudentProfile(studentId) || {
-    fullName: "Student",
-    enrollmentNo: "220130107054",
+    fullName: "",
+    enrollmentNo: "",
   };
 
   const attendance = event ? getStudentAttendanceForEvent(student.id, event.id) : null;

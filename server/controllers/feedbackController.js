@@ -105,21 +105,86 @@ export const createOrUpdateFeedbackForm = async (req, res) => {
       });
     }
 
+    // Backend Validation for questions array
+    if (questions !== undefined) {
+      if (!Array.isArray(questions)) {
+        return res.status(400).json({
+          success: false,
+          message: "Questions must be provided as an array.",
+        });
+      }
+
+      const validQuestions = questions.filter(
+        (q) => q && typeof q.question === "string" && q.question.trim().length > 0
+      );
+
+      if (validQuestions.length < 5) {
+        return res.status(400).json({
+          success: false,
+          message: `Feedback form requires a minimum of 5 non-empty questions (received ${validQuestions.length}).`,
+        });
+      }
+
+      if (validQuestions.length > 15) {
+        return res.status(400).json({
+          success: false,
+          message: `Feedback form supports a maximum of 15 questions (received ${validQuestions.length}).`,
+        });
+      }
+
+      const allowedTypes = ["rating", "textarea", "boolean", "radio", "checkbox", "text", "select"];
+
+      for (let i = 0; i < validQuestions.length; i++) {
+        const q = validQuestions[i];
+        const qType = q.type || "textarea";
+
+        if (!allowedTypes.includes(qType)) {
+          return res.status(400).json({
+            success: false,
+            message: `Question #${i + 1} has invalid type '${qType}'. Allowed types: ${allowedTypes.join(", ")}`,
+          });
+        }
+
+        if (qType === "radio" || qType === "checkbox") {
+          const opts = Array.isArray(q.options)
+            ? q.options.filter((o) => typeof o === "string" && o.trim().length > 0)
+            : [];
+          if (opts.length < 2) {
+            return res.status(400).json({
+              success: false,
+              message: `Question #${i + 1} (${q.question}) is a choice question and requires at least 2 non-empty options.`,
+            });
+          }
+          if (opts.length > 5) {
+            return res.status(400).json({
+              success: false,
+              message: `Question #${i + 1} (${q.question}) exceeds the maximum limit of 5 options.`,
+            });
+          }
+          q.options = opts;
+        } else if (qType === "textarea" || qType === "rating") {
+          q.options = [];
+        }
+      }
+
+      req.body.questions = validQuestions;
+    }
+
     let form = await FeedbackForm.findOne({ eventId });
 
     if (form) {
       if (title) form.title = title.trim();
-      if (Array.isArray(questions)) form.questions = questions;
-      if (isActive !== undefined) form.isActive = isActive;
+      if (Array.isArray(req.body.questions)) form.questions = req.body.questions;
+      if (isActive !== undefined) form.isActive = Boolean(isActive);
       form.createdBy = req.user._id;
       await form.save();
     } else {
       form = await FeedbackForm.create({
         eventId: event._id,
-        title: title || `${event.name} - Feedback Form`,
-        questions: Array.isArray(questions) ? questions : [],
+        title: title ? title.trim() : `${event.name} - Feedback Form`,
+        questions: Array.isArray(req.body.questions) ? req.body.questions : [],
         createdBy: req.user._id,
-        isActive: isActive !== undefined ? isActive : true,
+        isActive: isActive !== undefined ? Boolean(isActive) : true,
       });
     }
 
@@ -151,6 +216,7 @@ export const submitFeedback = async (req, res) => {
       contentRating,
       wouldRecommend,
       comment,
+      answers,
       isAnonymous,
     } = req.body;
 
@@ -193,7 +259,7 @@ export const submitFeedback = async (req, res) => {
     }
 
     // 4. Validate Rating Score (1 to 5)
-    const rating = Number(overallRating);
+    const rating = Number(overallRating) || 5;
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({
         success: false,
@@ -211,6 +277,7 @@ export const submitFeedback = async (req, res) => {
       contentRating: contentRating ? Number(contentRating) : rating,
       wouldRecommend: wouldRecommend !== undefined ? Boolean(wouldRecommend) : true,
       comment: (comment || "").trim(),
+      answers: answers && typeof answers === "object" ? answers : {},
       isAnonymous: Boolean(isAnonymous),
       editable: false,
       submittedAt: new Date(),

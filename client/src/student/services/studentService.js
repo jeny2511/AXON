@@ -812,10 +812,10 @@ export async function submitStudentFeedback(studentId, eventId, answers) {
   const activeUser = getActiveStudentUser();
   const evId = String(eventId?._id || eventId || "");
   const student = getStudentProfile(studentId) || {
-    fullName: activeUser?.name || "Student",
-    enrollmentNo: "220130107054",
-    department: "IT",
-    year: 3,
+    fullName: activeUser?.fullName || activeUser?.name || "",
+    enrollmentNo: activeUser?.enrollmentNumber || activeUser?.enrollmentNo || "",
+    department: activeUser?.department || "",
+    year: activeUser?.year || 1,
   };
 
   // Convert answers to backend payload format
@@ -887,7 +887,10 @@ export async function submitStudentFeedback(studentId, eventId, answers) {
 
   // Try live Express backend first
   try {
-    const res = await api.post(`/feedback/submit/${evId}`, payload);
+    const res = await api.post(`/feedback/submit/${evId}`, {
+      ...payload,
+      answers: answers || {},
+    });
     if (res && res.success) {
       localStorage.setItem(`axon_feedback_${studentId}_${evId}`, JSON.stringify(res.feedback || feedbackData));
       localStorage.setItem(`axon_feedback_${resolvedId}_${evId}`, JSON.stringify(res.feedback || feedbackData));
@@ -926,10 +929,10 @@ export async function submitStudentFeedback(studentId, eventId, answers) {
 
     const newResponse = {
       id: `RESP_${Date.now()}`,
-      name: student.fullName,
-      enrollment: student.enrollmentNo || "220130107054",
-      branch: student.department || "IT",
-      yearSem: student.year ? `${student.year}rd Year` : "3rd Year",
+      name: student.fullName || "",
+      enrollment: student.enrollmentNo || "",
+      branch: student.department || "",
+      yearSem: student.year ? `${student.year} Year` : "",
       answers,
     };
 
@@ -1253,36 +1256,36 @@ export function getStudentProfile(studentId) {
   if (activeUser && (activeUser.role === "student" || !activeUser.role)) {
     return {
       id: resolvedId || activeUser.id || activeUser._id,
-      fullName: activeUser.fullName || mockUser?.fullName || "Student",
+      fullName: activeUser.fullName || mockUser?.fullName || "",
       enrollmentNo:
         activeUser.enrollmentNumber ||
         activeUser.enrollmentNo ||
         mockUser?.enrollmentNo ||
-        "220130107054",
-      email: activeUser.email || mockUser?.email || "student@vgec.ac.in",
+        "",
+      email: activeUser.email || mockUser?.email || "",
       phone:
         activeUser.phoneNumber ||
         activeUser.phone ||
         mockUser?.phone ||
-        "9876543210",
-      department: activeUser.department || mockUser?.department || "IT",
+        "",
+      department: activeUser.department || mockUser?.department || "",
       year:
         activeUser.academicDetails?.currentYear ||
         activeUser.year ||
         mockUser?.year ||
-        3,
+        1,
       semester:
         activeUser.academicDetails?.currentSemester ||
         activeUser.semester ||
         mockUser?.semester ||
-        5,
+        1,
       batch: activeUser.academicDetails?.batch
         ? `${activeUser.academicDetails.batch.startYear}-${activeUser.academicDetails.batch.endYear}`
         : (typeof activeUser.batch === "object"
             ? `${activeUser.batch.startYear}-${activeUser.batch.endYear}`
             : activeUser.batch) ||
           mockUser?.batch ||
-          "2024-2028",
+          "",
       profilePhoto:
         activeUser.profilePhoto ||
         mockUser?.profilePhoto ||

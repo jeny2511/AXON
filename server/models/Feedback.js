@@ -59,6 +59,10 @@ const feedbackSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    answers: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     isAnonymous: {
       type: Boolean,
       default: false,

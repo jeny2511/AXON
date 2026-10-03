@@ -150,13 +150,13 @@ function Volunteers() {
     return getAcademicOptions(editFormData.admissionType);
   }, [editFormData.admissionType]);
 
-  // Load volunteers from backend + mockData + localStorage
+  // Load volunteers from backend + localStorage with strict enrollment deduplication
   const loadVolunteers = async () => {
     let backendVolunteers = [];
     try {
       const res = await api.get("/volunteer");
       const list = res?.data || res?.volunteers || (Array.isArray(res) ? res : []);
-      if (Array.isArray(list) && list.length > 0) {
+      if (Array.isArray(list)) {
         backendVolunteers = list.map((u) => ({
           ...u,
           id: u._id || u.id,
@@ -188,28 +188,15 @@ function Volunteers() {
       // Backend not running or token not set, gracefully proceed
     }
 
-    const mockVolunteers = users
-      .filter((user) => user.role === "volunteer")
-      .map((u) => ({
-        ...u,
-        enrollmentNumber: u.enrollmentNumber || u.enrollmentNo || "",
-        phoneNumber: u.phoneNumber || u.phone || "",
-        phone: u.phoneNumber || u.phone || "",
-        admissionType: u.admissionType || "regular",
-        batch: u.batch || "2024 - 2028",
-        committeePosition: u.committeePosition || u.committee || "Volunteer Member",
-        committee: u.committee || u.committeePosition || "Volunteer Member",
-        year: u.year || u.academicYear || 1,
-        status: "Active",
-      }));
-
     const addedVolunteers =
       JSON.parse(localStorage.getItem("axonVolunteers")) || [];
 
-    // Deduplicate by ID / enrollment
+    // Deduplicate strictly by unique Enrollment Number or Email ID (prevents temp ID vs Mongo _id duplicates)
     const map = new Map();
-    [...mockVolunteers, ...addedVolunteers, ...backendVolunteers].forEach((vol) => {
-      const key = vol.id || vol._id || vol.enrollmentNumber || vol.enrollmentNo;
+    [...addedVolunteers, ...backendVolunteers].forEach((vol) => {
+      const enrollKey = (vol.enrollmentNumber || vol.enrollmentNo || "").trim().toUpperCase();
+      const emailKey = (vol.email || "").trim().toLowerCase();
+      const key = enrollKey || emailKey || vol._id || vol.id;
       if (key) {
         map.set(key, {
           ...vol,
@@ -225,7 +212,8 @@ function Volunteers() {
       }
     });
 
-    setVolunteers(Array.from(map.values()));
+    const finalVolunteers = Array.from(map.values());
+    setVolunteers(finalVolunteers);
   };
 
   useEffect(() => {
@@ -429,13 +417,35 @@ function Volunteers() {
           (v.email && v.email.toLowerCase() === formattedEmail)
       );
 
-      if (isDuplicate) {
-        throw new Error("A volunteer with this Enrollment Number or Email ID already exists.");
+      // 2. Call live backend API first
+      let createdUser = null;
+      try {
+        const res = await api.post("/volunteer", {
+          fullName: addFormData.fullName.trim(),
+          email: formattedEmail,
+          password: addFormData.password,
+          department: addFormData.department,
+          admissionType: addFormData.admissionType,
+          year: Number(addFormData.year),
+          batch: addFormData.batch,
+          enrollmentNumber: formattedEnrollment,
+          phoneNumber: addFormData.phone.trim(),
+          committeePosition: addFormData.committeePosition,
+          profilePhoto: addFormData.profilePhoto || "/assets/images/profile/default.jpg",
+        });
+
+        createdUser = res?.data || res?.volunteer || res?.user || res;
+      } catch (backendErr) {
+        console.warn("Backend volunteer create fallback:", backendErr?.message || backendErr);
+        if (backendErr?.response?.data?.message) {
+          throw new Error(backendErr.response.data.message);
+        }
       }
 
+      const newId = createdUser?._id || createdUser?.id || `VOL${Date.now()}`;
       const newVolunteerRecord = {
-        id: `VOL${Date.now()}`,
-        _id: `VOL${Date.now()}`,
+        id: newId,
+        _id: newId,
         fullName: addFormData.fullName.trim(),
         name: addFormData.fullName.trim(),
         enrollmentNumber: formattedEnrollment,
@@ -456,39 +466,18 @@ function Volunteers() {
         createdAt: new Date().toISOString(),
       };
 
-      // Persist to local storage
+      // Persist deduplicated list to localStorage
       const existingCustom =
         JSON.parse(localStorage.getItem("axonVolunteers")) || [];
-      const updatedCustom = [newVolunteerRecord, ...existingCustom];
-      localStorage.setItem("axonVolunteers", JSON.stringify(updatedCustom));
+      const filteredCustom = existingCustom.filter((v) => {
+        const enroll = (v.enrollmentNumber || v.enrollmentNo || "").trim().toUpperCase();
+        const em = (v.email || "").trim().toLowerCase();
+        return enroll !== formattedEnrollment && em !== formattedEmail;
+      });
+      localStorage.setItem("axonVolunteers", JSON.stringify([newVolunteerRecord, ...filteredCustom]));
 
-      // Update state
-      setVolunteers([newVolunteerRecord, ...volunteers]);
+      await loadVolunteers();
       window.dispatchEvent(new Event("axon-volunteers-change"));
-
-      // Try live backend creation
-      try {
-        const res = await api.post("/volunteer", {
-          fullName: newVolunteerRecord.fullName,
-          email: newVolunteerRecord.email,
-          password: addFormData.password,
-          department: newVolunteerRecord.department,
-          admissionType: newVolunteerRecord.admissionType,
-          year: newVolunteerRecord.year,
-          batch: newVolunteerRecord.batch,
-          enrollmentNumber: newVolunteerRecord.enrollmentNumber,
-          phoneNumber: newVolunteerRecord.phoneNumber,
-          committeePosition: newVolunteerRecord.committeePosition,
-          profilePhoto: newVolunteerRecord.profilePhoto,
-        });
-
-        if (res?.data?._id || res?._id) {
-          newVolunteerRecord._id = res.data?._id || res._id;
-          newVolunteerRecord.id = res.data?._id || res._id;
-        }
-      } catch (backendErr) {
-        console.warn("Backend volunteer create fallback:", backendErr?.message || backendErr);
-      }
 
       setIsAddModalOpen(false);
       setNotification({

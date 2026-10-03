@@ -51,8 +51,8 @@ function Certificates() {
   const studentId = getActiveStudentId();
   const student = getStudentProfile(studentId) || {
     id: studentId,
-    fullName: "Student",
-    enrollmentNo: "220130107054",
+    fullName: "",
+    enrollmentNo: "",
   };
 
   const [, setSyncKey] = useState(0);

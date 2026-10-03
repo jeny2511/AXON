@@ -66,8 +66,8 @@ function MyEvents() {
   const studentId = getActiveStudentId();
   const student = getStudentProfile(studentId) || {
     id: studentId,
-    fullName: "Student",
-    enrollmentNo: "220130107054",
+    fullName: "",
+    enrollmentNo: "",
   };
 
   const [, setSyncTick] = useState(0);

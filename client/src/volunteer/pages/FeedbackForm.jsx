@@ -169,17 +169,17 @@ function FeedbackForm() {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 2500);
+    const timer = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(timer);
   }, [toast]);
 
   function createForm() {
     setQuestions(
       Array.from({ length: DEFAULT_QUESTIONS }, (_, index) => ({
-        id: `Q${Date.now()}_${index}`,
+        id: `Q_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 4)}`,
         question: "",
-        type: index < 2 ? "radio" : index < 4 ? "checkbox" : "textarea",
-        options: index < 2 ? ["Excellent", "Good", "Average"] : index < 4 ? ["Option 1", "Option 2"] : [],
+        type: index < 2 ? "rating" : index < 4 ? "radio" : index < 6 ? "checkbox" : "textarea",
+        options: index >= 2 && index < 6 ? ["Option 1", "Option 2"] : [],
       }))
     );
     setModal("create");
@@ -192,40 +192,62 @@ function FeedbackForm() {
       return;
     }
     setQuestions(
-      form.questions.map((question, idx) => ({
-        ...question,
-        id: question.id || `Q${Date.now()}_${idx}`,
-        options: Array.isArray(question.options) ? [...question.options] : [],
-      }))
+      form.questions.map((question, idx) => {
+        const qId = question.id || (question._id ? String(question._id) : `Q_${Date.now()}_${idx}`);
+        const rawType = question.type || "textarea";
+        const normalizedType = ["rating", "radio", "checkbox", "textarea"].includes(rawType)
+          ? rawType
+          : rawType === "boolean"
+          ? "radio"
+          : "textarea";
+
+        let options = Array.isArray(question.options) ? [...question.options] : [];
+        if ((normalizedType === "radio" || normalizedType === "checkbox") && options.length === 0) {
+          options = ["Option 1", "Option 2"];
+        }
+
+        return {
+          ...question,
+          id: qId,
+          type: normalizedType,
+          question: question.question || "",
+          options,
+        };
+      })
     );
     setModal("edit");
   }
 
   function updateQuestion(id, value) {
     setQuestions((items) =>
-      items.map((item) => (item.id === id ? { ...item, question: value } : item))
+      items.map((item) =>
+        String(item.id || item._id) === String(id) ? { ...item, question: value } : item
+      )
     );
   }
 
   function updateType(id, type) {
     setQuestions((items) =>
-      items.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              type,
-              options: type === "textarea" ? [] : item.options?.length ? item.options : ["Option 1", "Option 2"],
-            }
-          : item
-      )
+      items.map((item) => {
+        if (String(item.id || item._id) !== String(id)) return item;
+        let newOptions = [];
+        if (type === "radio" || type === "checkbox") {
+          newOptions = item.options && item.options.length >= 2 ? item.options : ["Option 1", "Option 2"];
+        }
+        return {
+          ...item,
+          type,
+          options: newOptions,
+        };
+      })
     );
   }
 
   function updateOption(questionId, index, value) {
     setQuestions((items) =>
       items.map((item) => {
-        if (item.id !== questionId) return item;
-        const options = [...item.options];
+        if (String(item.id || item._id) !== String(questionId)) return item;
+        const options = Array.isArray(item.options) ? [...item.options] : [];
         options[index] = value;
         return { ...item, options };
       })
@@ -234,19 +256,23 @@ function FeedbackForm() {
 
   function addOption(questionId) {
     setQuestions((items) =>
-      items.map((item) =>
-        item.id === questionId && item.options.length < MAX_OPTIONS
-          ? { ...item, options: [...item.options, `Option ${item.options.length + 1}`] }
-          : item
-      )
+      items.map((item) => {
+        if (String(item.id || item._id) !== String(questionId)) return item;
+        const currentOptions = Array.isArray(item.options) ? item.options : [];
+        if (currentOptions.length >= MAX_OPTIONS) return item;
+        return {
+          ...item,
+          options: [...currentOptions, `Option ${currentOptions.length + 1}`],
+        };
+      })
     );
   }
 
   function removeOption(questionId, optionIndex) {
     setQuestions((items) =>
       items.map((item) => {
-        if (item.id !== questionId) return item;
-        const options = item.options.filter((_, idx) => idx !== optionIndex);
+        if (String(item.id || item._id) !== String(questionId)) return item;
+        const options = (item.options || []).filter((_, idx) => idx !== optionIndex);
         return { ...item, options };
       })
     );
@@ -260,7 +286,7 @@ function FeedbackForm() {
     setQuestions((items) => [
       ...items,
       {
-        id: `Q${Date.now()}_${items.length}`,
+        id: `Q_${Date.now()}_${items.length}_${Math.random().toString(36).substr(2, 4)}`,
         question: "",
         type: "textarea",
         options: [],
@@ -273,27 +299,50 @@ function FeedbackForm() {
       setToast("At least 1 question must remain in the editor.");
       return;
     }
-    setQuestions((items) => items.filter((item) => item.id !== id));
+    setQuestions((items) => items.filter((item) => String(item.id || item._id) !== String(id)));
   }
 
   function saveForm() {
-    const validQuestions = questions.filter((q) => q.question.trim());
+    // 1. Frontend validation: Check question text
+    const emptyQuestionIdx = questions.findIndex((q) => !q.question || !q.question.trim());
+    if (emptyQuestionIdx >= 0) {
+      setToast(`Question #${emptyQuestionIdx + 1} has no text. Please enter the question.`);
+      return;
+    }
+
+    const validQuestions = questions.map((q) => {
+      const qType = q.type || "textarea";
+      let options = [];
+      if (qType === "radio" || qType === "checkbox") {
+        options = (q.options || []).map((o) => o.trim()).filter(Boolean);
+      }
+      return {
+        id: q.id || (q._id ? String(q._id) : undefined),
+        question: q.question.trim(),
+        type: qType,
+        options,
+      };
+    });
 
     if (validQuestions.length < MIN_QUESTIONS) {
       setToast(`Minimum ${MIN_QUESTIONS} non-empty questions are required (currently ${validQuestions.length}).`);
       return;
     }
 
-    const invalid = validQuestions.some((question) => {
-      if (question.type !== "textarea") {
-        return question.options.filter((opt) => opt && opt.trim()).length < 2;
-      }
-      return false;
-    });
-
-    if (invalid) {
-      setToast("Please complete at least 2 non-empty options for choice questions.");
+    if (validQuestions.length > MAX_QUESTIONS) {
+      setToast(`Maximum ${MAX_QUESTIONS} questions allowed.`);
       return;
+    }
+
+    // 2. Frontend validation: Choice questions must have at least 2 non-empty options
+    for (let i = 0; i < validQuestions.length; i++) {
+      const q = validQuestions[i];
+      if (q.type === "radio" || q.type === "checkbox") {
+        if (!q.options || q.options.length < 2) {
+          setToast(`Question #${i + 1} ("${q.question.slice(0, 25)}...") requires at least 2 valid options.`);
+          return;
+        }
+      }
     }
 
     const updatedForm = {
@@ -311,9 +360,9 @@ function FeedbackForm() {
     };
 
     setForms((items) => {
-      const exists = items.some((item) => item.eventId === selectedEvent.id);
+      const exists = items.some((item) => item.eventId === selectedEvent.id || item.eventId === selectedEvent._id);
       return exists
-        ? items.map((item) => (item.eventId === selectedEvent.id ? updatedForm : item))
+        ? items.map((item) => (item.eventId === selectedEvent.id || item.eventId === selectedEvent._id ? updatedForm : item))
         : [...items, updatedForm];
     });
 
@@ -949,79 +998,109 @@ function FormEditor({
       </div>
 
       <div className="mt-6 space-y-4">
-        {questions.map((question, index) => (
-          <div key={question.id || index} className="rounded-xl border border-gray-200 p-4 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold text-sm text-[#24154f]">
-                Question {index + 1}
-              </span>
-              <div className="flex items-center gap-2">
-                <select
-                  value={question.type}
-                  onChange={(e) => updateType(question.id, e.target.value)}
-                  className="rounded-lg border border-gray-200 px-3 py-1 text-xs outline-none bg-gray-50 font-medium"
-                >
-                  <option value="textarea">Textarea (Written)</option>
-                  <option value="radio">Radio (Single Choice)</option>
-                  <option value="checkbox">Checkbox (Multi Choice)</option>
-                </select>
+        {questions.map((question, index) => {
+          const qId = question.id || (question._id ? String(question._id) : `q_${index}`);
+          const qType = question.type || "textarea";
+          const isChoiceType = qType === "radio" || qType === "checkbox";
 
-                <button
-                  type="button"
-                  onClick={() => removeQuestion(question.id)}
-                  className="rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                  title="Delete Question"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
+          return (
+            <div key={qId} className="rounded-xl border border-gray-200 p-4 bg-white shadow-sm transition-all hover:border-purple-200">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-sm text-[#24154f]">
+                  Question {index + 1}
+                </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={qType}
+                    onChange={(e) => updateType(qId, e.target.value)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs outline-none bg-gray-50 font-medium text-gray-700 focus:border-purple-500 focus:bg-white"
+                  >
+                    <option value="rating">⭐️ Rating (1 to 5 Stars)</option>
+                    <option value="radio">🔘 Radio (Single Choice)</option>
+                    <option value="checkbox">☑️ Checkbox (Multi Choice)</option>
+                    <option value="textarea">📝 Textarea (Written)</option>
+                  </select>
 
-            <textarea
-              value={question.question}
-              onChange={(e) => updateQuestion(question.id, e.target.value)}
-              rows={2}
-              placeholder="Enter your question text here..."
-              className="mt-3 w-full rounded-lg border border-gray-200 p-3 text-sm outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-            />
-
-            {question.type !== "textarea" && (
-              <div className="mt-3 space-y-2">
-                <p className="text-xs font-medium text-gray-500">Options (Max 5):</p>
-                {question.options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="flex items-center gap-2">
-                    <input
-                      value={option}
-                      onChange={(e) => updateOption(question.id, optionIndex, e.target.value)}
-                      placeholder={`Option ${optionIndex + 1}`}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-purple-500"
-                    />
-                    {question.options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => removeOption(question.id, optionIndex)}
-                        className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-500"
-                        title="Remove option"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {question.options.length < MAX_OPTIONS && (
                   <button
                     type="button"
-                    onClick={() => addOption(question.id)}
-                    className="text-xs font-semibold text-purple-700 hover:text-purple-900 pt-1 block"
+                    onClick={() => removeQuestion(qId)}
+                    className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    title="Delete Question"
                   >
-                    + Add option
+                    <Trash2 size={16} />
                   </button>
-                )}
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              <textarea
+                value={question.question || ""}
+                onChange={(e) => updateQuestion(qId, e.target.value)}
+                rows={2}
+                placeholder="Enter question text..."
+                className="mt-3 w-full rounded-lg border border-gray-200 p-3 text-sm outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              />
+
+              {/* Dynamic Type Indicators / Option Inputs */}
+              {isChoiceType && (
+                <div className="mt-3 rounded-lg bg-gray-50/70 border border-gray-100 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-600">
+                      Options (Max 5, Min 2 required):
+                    </p>
+                    <span className="text-[11px] text-purple-600 font-medium capitalize">
+                      {qType === "radio" ? "Single Choice" : "Multi Choice"}
+                    </span>
+                  </div>
+
+                  {(question.options || []).map((option, optionIndex) => (
+                    <div key={optionIndex} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 font-mono w-4">{optionIndex + 1}.</span>
+                      <input
+                        value={option}
+                        onChange={(e) => updateOption(qId, optionIndex, e.target.value)}
+                        placeholder={`Option ${optionIndex + 1}`}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-purple-500"
+                      />
+                      {(question.options || []).length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => removeOption(qId, optionIndex)}
+                          className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          title="Remove option"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {(question.options || []).length < MAX_OPTIONS && (
+                    <button
+                      type="button"
+                      onClick={() => addOption(qId)}
+                      className="text-xs font-semibold text-purple-700 hover:text-purple-900 pt-1 flex items-center gap-1"
+                    >
+                      <Plus size={13} />
+                      Add option
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {qType === "rating" && (
+                <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-purple-50/70 border border-purple-100 px-3 py-2 text-xs text-purple-800">
+                  <span>⭐️ 1 to 5 Star Rating Scale will be presented to attendees</span>
+                </div>
+              )}
+
+              {qType === "textarea" && (
+                <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-blue-50/70 border border-blue-100 px-3 py-2 text-xs text-blue-800">
+                  <span>📝 Open-ended written feedback box will be provided</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {questions.length < MAX_QUESTIONS && (
@@ -1081,29 +1160,47 @@ function ViewForm({ form, onClose, onEdit, canEdit }) {
       </div>
 
       <div className="mt-5 space-y-4">
-        {form?.questions?.map((question, index) => (
-          <div key={question.id} className="rounded-xl border border-gray-200 p-4">
-            <p className="font-medium text-gray-800">
-              {index + 1}. {question.question}
-            </p>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-purple-600">
-              {question.type}
-            </p>
-
-            {question.options?.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {question.options.map((option, i) => (
-                  <span
-                    key={i}
-                    className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
-                  >
-                    {option}
-                  </span>
-                ))}
+        {form?.questions?.map((question, index) => {
+          const qId = question.id || question._id || `q_${index}`;
+          const qType = question.type || "textarea";
+          return (
+            <div key={qId} className="rounded-xl border border-gray-200 p-4 bg-white shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-gray-800 text-sm">
+                  {index + 1}. {question.question}
+                </p>
+                <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-semibold text-purple-700 capitalize">
+                  {qType === "rating" ? "1-5 Stars" : qType === "radio" ? "Single Choice" : qType === "checkbox" ? "Multi Choice" : "Written"}
+                </span>
               </div>
-            )}
-          </div>
-        ))}
+
+              {qType === "rating" && (
+                <div className="mt-2.5 flex items-center gap-1 text-amber-400">
+                  {"★".repeat(5)} <span className="text-xs text-gray-400 ml-1">(1 - 5 Scale)</span>
+                </div>
+              )}
+
+              {question.options?.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {question.options.map((option, i) => (
+                    <span
+                      key={i}
+                      className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700 font-medium"
+                    >
+                      {option}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {qType === "textarea" && (
+                <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-xs text-gray-400 italic">
+                  Student written response area...
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
