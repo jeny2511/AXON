@@ -133,15 +133,9 @@ const eventService = {
       const res = await api.get("/events?limit=100");
       if (res && Array.isArray(res.events)) {
         const backendNormalized = res.events.map(normalizeBackendEvent).filter(Boolean);
-        if (backendNormalized.length > 0) {
-          const dbIds = new Set(backendNormalized.map((e) => String(e.id || e._id)));
-          const currentLocal = eventService.getAllEvents();
-          const retainedLocal = currentLocal.filter((e) => !dbIds.has(String(e.id || e._id)));
-          const merged = [...backendNormalized, ...retainedLocal];
-          localStorage.setItem("axon_live_events", JSON.stringify(merged));
-          window.dispatchEvent(new Event("axon-events-change"));
-          return merged;
-        }
+        localStorage.setItem("axon_live_events", JSON.stringify(backendNormalized));
+        window.dispatchEvent(new Event("axon-events-change"));
+        return backendNormalized;
       }
     } catch (err) {
       console.warn("Could not fetch events from /api/events:", err?.message || err);

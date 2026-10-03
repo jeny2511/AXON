@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { events as initialMockEvents, users } from "../../mockData";
+import api from "../../services/api";
 
 // Format date helper
 function formatDate(dateStr) {
@@ -68,10 +69,38 @@ function Attendance() {
     return initialMockEvents;
   });
 
-  // Load volunteers (mock + custom created)
+  // Load volunteers (mock + custom created + live backend)
   const [volunteers, setVolunteers] = useState([]);
 
-  const loadVolunteersList = () => {
+  const loadVolunteersList = async () => {
+    let backendVolunteers = [];
+    try {
+      const res = await api.get("/volunteer");
+      const list = res?.data || res?.volunteers || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        backendVolunteers = list.map((u) => ({
+          ...u,
+          id: u._id || u.id,
+          _id: u._id || u.id,
+          fullName: u.fullName || u.name || "",
+          name: u.fullName || u.name || "",
+          enrollmentNumber: u.enrollmentNumber || u.enrollmentNo || "",
+          enrollmentNo: u.enrollmentNumber || u.enrollmentNo || "",
+          phoneNumber: u.phoneNumber || u.phone || "",
+          phone: u.phoneNumber || u.phone || "",
+          committeePosition:
+            u.committeePosition?.name ||
+            (typeof u.committeePosition === "string" ? u.committeePosition : u.committee) ||
+            "Volunteer Member",
+          committee:
+            u.committeePosition?.name ||
+            (typeof u.committeePosition === "string" ? u.committeePosition : u.committee) ||
+            "Volunteer Member",
+          year: u.year || u.academicYear || 1,
+        }));
+      }
+    } catch {}
+
     const mockVolunteers = users
       .filter((user) => user.role === "volunteer")
       .map((u) => ({
@@ -86,7 +115,7 @@ function Attendance() {
       JSON.parse(localStorage.getItem("axonVolunteers")) || [];
 
     const map = new Map();
-    [...mockVolunteers, ...addedVolunteers].forEach((vol) => {
+    [...mockVolunteers, ...addedVolunteers, ...backendVolunteers].forEach((vol) => {
       const key = vol.id || vol._id || vol.enrollmentNumber || vol.enrollmentNo;
       if (key) {
         map.set(key, {
@@ -223,7 +252,7 @@ function Attendance() {
   };
 
   // Submit / Save Attendance
-  const handleSubmitAttendance = () => {
+  const handleSubmitAttendance = async () => {
     if (!selectedEvent) return;
     const eventKey = selectedEvent.id || selectedEvent._id;
 
@@ -233,6 +262,34 @@ function Attendance() {
     };
     setSubmittedEvents(newSubmitted);
     saveAttendanceData(attendanceRecords, newSubmitted);
+
+    // Sync volunteer attendance records to backend
+    try {
+      const eventData = attendanceRecords[eventKey] || {};
+      const entries = Object.entries(eventData);
+      for (const [volKey, status] of entries) {
+        const matchedVol = volunteers.find(
+          (v) => (v.id === volKey || v._id === volKey || v.enrollmentNumber === volKey)
+        );
+        if (matchedVol) {
+          const volId = matchedVol._id || matchedVol.id;
+          if (volId && volId.length === 24) {
+            await api.post("/attendance/volunteers", {
+              volunteerId: volId,
+              activityType: "event_duty",
+              eventId: eventKey && eventKey.length === 24 ? eventKey : undefined,
+              eventName: selectedEvent.name,
+              date: selectedEvent.eventDate || selectedEvent.date || new Date().toISOString().split("T")[0],
+              time: selectedEvent.startTime || "10:00 AM",
+              venue: selectedEvent.venue || "Campus Venue",
+              attendanceStatus: status === "Present" ? "present" : "absent",
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Backend volunteer attendance sync fallback:", err?.message || err);
+    }
 
     setNotification({
       type: "success",

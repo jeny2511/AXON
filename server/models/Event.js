@@ -312,4 +312,5 @@ eventSchema.index({ date: 1, isDeleted: 1 });
 eventSchema.index({ "registration.closeAt": 1, isDeleted: 1 });
 
 const Event = mongoose.model("Event", eventSchema);
+export { Event };
 export default Event;

@@ -11,6 +11,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { events as mockEvents, users as mockUsers, registrations as mockRegistrations, attendances as mockAttendances } from "../../mockData";
+import api from "../../services/api";
 
 const quickAccessItems = [
   {
@@ -51,7 +52,47 @@ function Dashboard() {
     return mockEvents;
   });
 
+  const [liveVolunteersCount, setLiveVolunteersCount] = useState(
+    mockUsers.filter((u) => u.role === "volunteer").length
+  );
+
   useEffect(() => {
+    // Fetch live events
+    api.get("/events")
+      .then((res) => {
+        const list = res?.events || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const normalized = list.map((ev) => ({
+            ...ev,
+            id: ev._id || ev.id,
+            _id: ev._id || ev.id,
+            name: ev.name || ev.title,
+            category: ev.category || "Workshop",
+            eventDate: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            date: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            startTime: ev.startTime || "10:00 AM",
+            endTime: ev.endTime || "01:00 PM",
+            venue: ev.venue || "Campus Venue",
+            status: ev.status || "upcoming",
+          }));
+          setLiveEvents(normalized);
+          try {
+            localStorage.setItem("axon_live_events", JSON.stringify(normalized));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // Fetch live volunteers
+    api.get("/volunteer")
+      .then((res) => {
+        const list = res?.data || res?.volunteers || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          setLiveVolunteersCount(list.length);
+        }
+      })
+      .catch(() => {});
+
     const handleSync = () => {
       const cached = localStorage.getItem("axon_live_events");
       if (cached) {
@@ -67,7 +108,7 @@ function Dashboard() {
 
   const totalEventsCount = liveEvents.length;
   const upcomingEventsCount = liveEvents.filter((e) => e.status === "upcoming").length;
-  const totalVolunteersCount = mockUsers.filter((u) => u.role === "volunteer").length;
+  const totalVolunteersCount = liveVolunteersCount;
   const totalStudentsCount = mockUsers.filter((u) => u.role === "student").length;
   const totalRegistrationsCount = mockRegistrations.filter((r) => r.status === "registered").length;
 

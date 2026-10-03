@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { events as initialMockEvents } from "../../mockData";
+import api from "../../services/api";
 
 // Format date helper (e.g. "23 Oct 2027")
 function formatDate(dateStr) {
@@ -155,8 +156,38 @@ function Events() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [rulebookModalEvent, setRulebookModalEvent] = useState(null);
 
-  // Sync with live events updates
+  // Fetch live events from backend
   useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const res = await api.get("/events");
+        const list = res?.events || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list)) {
+          const normalized = list.map((ev) => ({
+            ...ev,
+            id: ev._id || ev.id,
+            _id: ev._id || ev.id,
+            name: ev.name || ev.title,
+            category: ev.category || "Technical Workshop",
+            eventDate: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            date: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            startTime: ev.startTime || "10:00 AM",
+            endTime: ev.endTime || "01:00 PM",
+            venue: ev.venue || "Campus Auditorium",
+            status: ev.status || "upcoming",
+            poster: ev.poster || null,
+          }));
+          setEventsList(normalized);
+          try {
+            localStorage.setItem("axon_live_events", JSON.stringify(normalized));
+          } catch {}
+        }
+      } catch {
+        // Fallback to localStorage or mock
+      }
+    };
+    fetchEvents();
+
     const handleEventsChange = () => {
       try {
         const saved = localStorage.getItem("axon_live_events");

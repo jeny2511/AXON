@@ -12,6 +12,7 @@ import {
   loginStudent,
   signupStudent,
 } from "../services/authService";
+import { users as mockUsers } from "../../mockData/users";
 import "./Profile.css";
 
 function Profile() {

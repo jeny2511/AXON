@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "./pages.css";
 import "./Feedback.css";
@@ -8,6 +8,8 @@ import {
   getStudentProfile,
   getEventById,
   getAllEvents,
+  fetchEvents,
+  fetchStudentFeedbackSubmissions,
   hasSubmittedFeedback,
   submitStudentFeedback,
 } from "../services/studentService";
@@ -22,11 +24,35 @@ function Feedback() {
     fullName: "Student",
   };
 
-  const allEvents = getAllEvents();
-  const defaultEventId = paramEventId || "EV004";
+  const [allEvents, setAllEvents] = useState(getAllEvents());
+  const defaultEventId = paramEventId || (allEvents[0]?.id || allEvents[0]?._id || "EV004");
   const [selectedEventId, setSelectedEventId] = useState(defaultEventId);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedEvent = getEventById(selectedEventId) || allEvents[0];
+  useEffect(() => {
+    fetchEvents().then((evs) => {
+      if (Array.isArray(evs) && evs.length > 0) {
+        setAllEvents(evs);
+        if (!paramEventId) {
+          setSelectedEventId(evs[0].id || evs[0]._id);
+        }
+      }
+    }).catch(() => {});
+    fetchStudentFeedbackSubmissions().catch(() => {});
+
+    const handleEventsChange = () => {
+      const updated = getAllEvents();
+      setAllEvents(updated);
+    };
+    window.addEventListener("axon-events-change", handleEventsChange);
+    window.addEventListener("axon-feedback-change", handleEventsChange);
+    return () => {
+      window.removeEventListener("axon-events-change", handleEventsChange);
+      window.removeEventListener("axon-feedback-change", handleEventsChange);
+    };
+  }, [paramEventId]);
+
+  const selectedEvent = getEventById(selectedEventId) || allEvents.find((e) => e.id === selectedEventId || e._id === selectedEventId) || allEvents[0];
 
   const [formData, setFormData] = useState({
     overallRating: "",
@@ -40,8 +66,9 @@ function Feedback() {
   const [error, setError] = useState("");
 
   const isSubmitted = selectedEvent
-    ? hasSubmittedFeedback(student.id, selectedEvent.id) ||
-      submittedEventIds.includes(selectedEvent.id)
+    ? hasSubmittedFeedback(student.id, selectedEvent.id || selectedEvent._id) ||
+      submittedEventIds.includes(selectedEvent.id) ||
+      submittedEventIds.includes(selectedEvent._id)
     : false;
 
   const handleChange = (event) => {
@@ -67,7 +94,7 @@ function Feedback() {
     setError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (
@@ -80,10 +107,17 @@ function Feedback() {
       return;
     }
 
-    submitStudentFeedback(student.id, selectedEvent.id, formData);
-
+    setIsSubmitting(true);
     setError("");
-    setSubmittedEventIds((prev) => [...prev, selectedEvent.id]);
+    try {
+      const evId = selectedEvent.id || selectedEvent._id;
+      await submitStudentFeedback(student.id, evId, formData);
+      setSubmittedEventIds((prev) => [...prev, evId, selectedEvent.id, selectedEvent._id].filter(Boolean));
+    } catch (err) {
+      setError(err.message || "Failed to submit feedback.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

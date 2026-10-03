@@ -93,4 +93,5 @@ certificateSchema.index(
 );
 
 const Certificate = mongoose.model("Certificate", certificateSchema);
+export { Certificate };
 export default Certificate;

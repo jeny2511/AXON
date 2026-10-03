@@ -88,4 +88,5 @@ studentAttendanceSchema.index(
 );
 
 const Attendance = mongoose.model("Attendance", studentAttendanceSchema);
+export { Attendance };
 export default Attendance;

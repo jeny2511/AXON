@@ -9,7 +9,7 @@ import {
 
 import { attendance, events as initialMockEvents, users } from "../../mockData";
 import { getAuthUser } from "../../services/authService";
-import { API_BASE_URL } from "../../services/api";
+import api, { API_BASE_URL } from "../../services/api";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
@@ -48,6 +48,41 @@ function MyPresence() {
     return initialMockEvents;
   });
 
+  const [liveAttendanceRecords, setLiveAttendanceRecords] = useState([]);
+
+  // Fetch live events and attendance records
+  useEffect(() => {
+    api.get("/events")
+      .then((res) => {
+        const list = res?.events || res?.data || (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const normalized = list.map((ev) => ({
+            ...ev,
+            id: ev._id || ev.id,
+            _id: ev._id || ev.id,
+            name: ev.name || ev.title,
+            category: ev.category || "Workshop",
+            eventDate: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            date: ev.date ? ev.date.split("T")[0] : ev.eventDate,
+            startTime: ev.startTime || "10:00 AM",
+            endTime: ev.endTime || "01:00 PM",
+            venue: ev.venue || "Campus Venue",
+            status: ev.status || "upcoming",
+          }));
+          setEventsList(normalized);
+        }
+      })
+      .catch(() => {});
+
+    api.get("/attendance/volunteers")
+      .then((res) => {
+        if (res && res.records && Array.isArray(res.records)) {
+          setLiveAttendanceRecords(res.records);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Current logged in volunteer
   const currentVolunteer = useMemo(() => {
     const authUser = getAuthUser();
@@ -73,11 +108,22 @@ function MyPresence() {
     );
   }, []);
 
-  // Events where this volunteer's attendance has been marked present by Admin
+  // Events where this volunteer's attendance has been marked present
   const attendedEvents = useMemo(() => {
     const volunteerId = currentVolunteer?.id || currentVolunteer?._id || currentVolunteer?.userId || "VL002";
 
-    // Find all event IDs where volunteer's attendance is marked present
+    // 1. Check live backend records
+    const backendEventIds = liveAttendanceRecords
+      .filter((rec) => {
+        const matchesVol =
+          rec.volunteerId === volunteerId ||
+          rec.volunteerId?._id === volunteerId ||
+          rec.volunteerId?.id === volunteerId;
+        return matchesVol && (rec.attendanceStatus === "present" || rec.status === "present");
+      })
+      .map((rec) => rec.eventId?._id || rec.eventId || rec.event);
+
+    // 2. Local storage records
     let allAttendance = attendance;
     try {
       const liveAtt = localStorage.getItem("axon_attendance_records");
@@ -94,19 +140,19 @@ function MyPresence() {
       )
       .map((record) => record.eventId || record.event);
 
-    // Fallback default events where volunteer attendance is registered/marked
     const activeEventIds = [
-      ...new Set(
-        markedEventIds.length
+      ...new Set([
+        ...backendEventIds,
+        ...(markedEventIds.length
           ? markedEventIds
           : volunteerId === "VL001"
           ? ["EV001", "EV004", "EV011"]
-          : ["EV005", "EV013", "EV014"]
-      ),
+          : ["EV005", "EV013", "EV014"]),
+      ]),
     ];
 
     return eventsList.filter((event) => activeEventIds.includes(event.id) || activeEventIds.includes(event._id));
-  }, [currentVolunteer, eventsList]);
+  }, [currentVolunteer, eventsList, liveAttendanceRecords]);
 
   // Filtered by search if user types in search bar
   const filteredEvents = useMemo(() => {

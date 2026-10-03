@@ -80,4 +80,5 @@ registrationSchema.index(
 );
 
 const Registration = mongoose.model("Registration", registrationSchema);
+export { Registration };
 export default Registration;

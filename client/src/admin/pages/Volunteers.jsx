@@ -150,18 +150,57 @@ function Volunteers() {
     return getAcademicOptions(editFormData.admissionType);
   }, [editFormData.admissionType]);
 
-  // Load volunteers from mockData + localStorage
-  const loadVolunteers = () => {
+  // Load volunteers from backend + mockData + localStorage
+  const loadVolunteers = async () => {
+    let backendVolunteers = [];
+    try {
+      const res = await api.get("/volunteer");
+      const list = res?.data || res?.volunteers || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        backendVolunteers = list.map((u) => ({
+          ...u,
+          id: u._id || u.id,
+          _id: u._id || u.id,
+          fullName: u.fullName || u.name || "",
+          name: u.fullName || u.name || "",
+          enrollmentNumber: u.enrollmentNumber || u.enrollmentNo || "",
+          enrollmentNo: u.enrollmentNumber || u.enrollmentNo || "",
+          phoneNumber: u.phoneNumber || u.phone || "",
+          phone: u.phoneNumber || u.phone || "",
+          department: u.department || "IT",
+          admissionType: u.admissionType || "regular",
+          batch: u.batch || "2024 - 2028",
+          committeePosition:
+            u.committeePosition?.name ||
+            (typeof u.committeePosition === "string" ? u.committeePosition : u.committee) ||
+            "Volunteer Member",
+          committee:
+            u.committeePosition?.name ||
+            (typeof u.committeePosition === "string" ? u.committeePosition : u.committee) ||
+            "Volunteer Member",
+          year: u.year || u.academicYear || 1,
+          academicYear: u.year || u.academicYear || 1,
+          profilePhoto: u.profilePhoto || "/assets/images/profile/default.jpg",
+          status: u.isActive !== false ? "Active" : "Inactive",
+        }));
+      }
+    } catch {
+      // Backend not running or token not set, gracefully proceed
+    }
+
     const mockVolunteers = users
       .filter((user) => user.role === "volunteer")
       .map((u) => ({
         ...u,
         enrollmentNumber: u.enrollmentNumber || u.enrollmentNo || "",
         phoneNumber: u.phoneNumber || u.phone || "",
+        phone: u.phoneNumber || u.phone || "",
         admissionType: u.admissionType || "regular",
         batch: u.batch || "2024 - 2028",
         committeePosition: u.committeePosition || u.committee || "Volunteer Member",
+        committee: u.committee || u.committeePosition || "Volunteer Member",
         year: u.year || u.academicYear || 1,
+        status: "Active",
       }));
 
     const addedVolunteers =
@@ -169,7 +208,7 @@ function Volunteers() {
 
     // Deduplicate by ID / enrollment
     const map = new Map();
-    [...mockVolunteers, ...addedVolunteers].forEach((vol) => {
+    [...mockVolunteers, ...addedVolunteers, ...backendVolunteers].forEach((vol) => {
       const key = vol.id || vol._id || vol.enrollmentNumber || vol.enrollmentNo;
       if (key) {
         map.set(key, {
@@ -181,6 +220,7 @@ function Volunteers() {
           committee: vol.committee || vol.committeePosition || "Volunteer Member",
           batch: vol.batch || "2024 - 2028",
           admissionType: vol.admissionType || "regular",
+          status: vol.status || "Active",
         });
       }
     });
@@ -426,14 +466,12 @@ function Volunteers() {
       setVolunteers([newVolunteerRecord, ...volunteers]);
       window.dispatchEvent(new Event("axon-volunteers-change"));
 
-      // Try backend sync
+      // Try live backend creation
       try {
-        await api.post("/auth/register", {
-          name: newVolunteerRecord.fullName,
+        const res = await api.post("/volunteer", {
           fullName: newVolunteerRecord.fullName,
           email: newVolunteerRecord.email,
           password: addFormData.password,
-          role: "volunteer",
           department: newVolunteerRecord.department,
           admissionType: newVolunteerRecord.admissionType,
           year: newVolunteerRecord.year,
@@ -443,8 +481,13 @@ function Volunteers() {
           committeePosition: newVolunteerRecord.committeePosition,
           profilePhoto: newVolunteerRecord.profilePhoto,
         });
+
+        if (res?.data?._id || res?._id) {
+          newVolunteerRecord._id = res.data?._id || res._id;
+          newVolunteerRecord.id = res.data?._id || res._id;
+        }
       } catch (backendErr) {
-        console.warn("Backend volunteer register fallback:", backendErr?.message || backendErr);
+        console.warn("Backend volunteer create fallback:", backendErr?.message || backendErr);
       }
 
       setIsAddModalOpen(false);

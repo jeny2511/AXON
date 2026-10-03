@@ -448,4 +448,5 @@ userSchema.index({ email: 1, isDeleted: 1 });
 userSchema.index({ enrollmentNumber: 1, isDeleted: 1 });
 
 const User = mongoose.model("User", userSchema);
+export { User };
 export default User;

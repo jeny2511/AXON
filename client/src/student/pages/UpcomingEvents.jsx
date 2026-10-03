@@ -20,6 +20,7 @@ import {
   isStudentRegistered,
   checkRegistrationEligibility,
   registerStudentForEvent,
+  registerStudentForEventAsync,
 } from "../services/studentService";
 import { filterEventsBySearch } from "../utils/filterEvents";
 
@@ -139,7 +140,7 @@ function UpcomingEvents() {
   };
 
   // Register with rulebook validation check
-  const handleRegisterClick = (event) => {
+  const handleRegisterClick = async (event) => {
     const hasRulebook = Boolean(event.rulebook && event.rulebook.trim() !== "");
     if (hasRulebook && !hasViewedRulebook) {
       setRegistrationMessage(
@@ -154,10 +155,18 @@ function UpcomingEvents() {
       return;
     }
 
-    registerStudentForEvent(student.id, event.id);
-    setRegistrationMessage(
-      "Registered successfully! Your attendance QR pass is available in My Events."
-    );
+    try {
+      const evId = event.id || event._id;
+      await registerStudentForEventAsync(student.id, evId);
+      setRegistrationMessage(
+        "Registered successfully! Your attendance QR pass is available in My Events."
+      );
+    } catch (err) {
+      registerStudentForEvent(student.id, event.id || event._id);
+      setRegistrationMessage(
+        "Registered successfully! Your attendance QR pass is available in My Events."
+      );
+    }
   };
 
   // Compute allowed combinations for the currently viewed event
