@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
+import dotenv from "dotenv";
+dotenv.config();
+import User from "../models/User.js";
 
 /**
- * Connect to MongoDB Atlas
- * Handled by Preyas
+ * Connect to MongoDB Atlas and Seed Default Admin Account
  */
 const connectDB = async () => {
   try {
@@ -17,9 +19,13 @@ const connectDB = async () => {
 
     const conn = await mongoose.connect(mongoURI);
     console.log(`✅ [Database] MongoDB Connected: ${conn.connection.host}`);
+
+    // Seed default admin account if not already present
+    await User.seedDefaultAdmin();
   } catch (error) {
     console.error(`❌ [Database] MongoDB Connection Error: ${error.message}`);
   }
 };
 
 export default connectDB;
+

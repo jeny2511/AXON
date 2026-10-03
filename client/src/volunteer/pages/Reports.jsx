@@ -10,19 +10,24 @@ import {
     X,
 } from "lucide-react";
 
-import { events } from "../../mockData";
+import { eventService } from "../../services/eventService";
+import { reportService } from "../../services/reportService";
+import { getAssetUrl } from "../../utils/urlUtils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function getEventStatus(event) {
+    if (!event) return "upcoming";
     const now = new Date();
+    const dateStr = event.eventDate || event.date;
+    if (!dateStr) return "upcoming";
 
     const start = new Date(
-        `${event.eventDate}T${event.startTime}`
+        `${new Date(dateStr).toISOString().split("T")[0]}T${event.startTime || "09:00 AM"}`
     );
 
     const end = new Date(
-        `${event.eventDate}T${event.endTime}`
+        `${new Date(dateStr).toISOString().split("T")[0]}T${event.endTime || "05:00 PM"}`
     );
 
     if (now < start) return "upcoming";
@@ -31,17 +36,24 @@ function getEventStatus(event) {
 }
 
 function formatDate(date) {
-    return new Date(`${date}T00:00:00`).toLocaleDateString(
-        "en-IN",
-        {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-        }
-    );
+    if (!date) return "";
+    try {
+        return new Date(date).toLocaleDateString(
+            "en-IN",
+            {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+            }
+        );
+    } catch {
+        return String(date);
+    }
 }
 
 function Reports() {
+    const [eventsList, setEventsList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [search, setSearch] = useState("");
     const [showEvents, setShowEvents] = useState(false);
@@ -62,29 +74,57 @@ function Reports() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const nearestEvent = useMemo(() => {
-        return [...events].sort((a, b) => {
-            const aTime = new Date(
-                `${a.eventDate}T${a.startTime}`
-            ).getTime();
-
-            const bTime = new Date(
-                `${b.eventDate}T${b.startTime}`
-            ).getTime();
-
-            return (
-                Math.abs(aTime - Date.now()) -
-                Math.abs(bTime - Date.now())
-            );
-        })[0];
-    }, []);
-
+    // Load Events and Reports from API
     useEffect(() => {
-        if (!selectedEvent && nearestEvent) {
-            setSelectedEvent(nearestEvent);
-            setSearch(nearestEvent.name);
+        let isMounted = true;
+        async function loadData() {
+            try {
+                setLoading(true);
+                const [evRes, repRes] = await Promise.all([
+                    eventService.getEvents().catch(() => ({ data: [] })),
+                    reportService.getReports().catch(() => ({ data: [] })),
+                ]);
+
+                const liveEvents = evRes?.data || [];
+                const liveReports = repRes?.data || [];
+
+                const map = {};
+                liveReports.forEach((rep) => {
+                    const evId = (rep.eventId?._id || rep.eventId?.id || rep.eventId)?.toString();
+                    if (evId) {
+                        map[evId] = {
+                            id: rep._id,
+                            name: rep.reportUrl?.split("/").pop() || "Event Report",
+                            reportUrl: rep.reportUrl,
+                            status: rep.status || "pending",
+                            uploadedAt: rep.uploadedAt || rep.createdAt,
+                            uploadedBy: rep.uploadedBy,
+                            sentToAdmin: true,
+                            history: rep.history || [],
+                        };
+                    }
+                });
+
+                if (isMounted) {
+                    setReports(map);
+                    setEventsList(liveEvents);
+                    if (liveEvents.length > 0) {
+                        setSelectedEvent(liveEvents[0]);
+                        setSearch(liveEvents[0].name);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to load events/reports:", err.message);
+                if (isMounted) setEventsList([]);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
         }
-    }, [nearestEvent, selectedEvent]);
+        loadData();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!toast) return;
@@ -98,25 +138,37 @@ function Reports() {
             !search.trim() ||
             (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
         ) {
-            return events;
+            return eventsList;
         }
-        return events.filter((event) =>
+        return eventsList.filter((event) =>
             event.name.toLowerCase().includes(search.toLowerCase())
         );
-    }, [search, selectedEvent]);
+    }, [eventsList, search, selectedEvent]);
 
     const status = selectedEvent
         ? getEventStatus(selectedEvent)
         : "";
 
     const report = selectedEvent
-        ? reports[selectedEvent.id]
+        ? reports[selectedEvent._id || selectedEvent.id]
         : null;
 
-    if (!selectedEvent) {
+    if (loading) {
         return (
-            <div className="p-6 text-sm text-gray-500">
-                Loading reports...
+            <div className="p-8 text-center text-sm text-gray-500">
+                Loading events and reports...
+            </div>
+        );
+    }
+
+    if (!selectedEvent || eventsList.length === 0) {
+        return (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
+                <FileText size={40} className="mx-auto text-gray-300" />
+                <h3 className="mt-4 font-semibold text-gray-700">No events available</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+                    Create an event in Admin to upload and manage event reports.
+                </p>
             </div>
         );
     }
@@ -144,46 +196,73 @@ function Reports() {
             return;
         }
 
+        const evId = (selectedEvent._id || selectedEvent.id)?.toString();
         setReports((current) => ({
             ...current,
-            [selectedEvent.id]: {
+            [evId]: {
                 file,
                 name: file.name,
                 sentToAdmin: false,
             },
         }));
 
-        setToast("Report uploaded successfully.");
+        setToast("Report uploaded. Click 'Send to Admin' to submit.");
     }
 
     function downloadReport() {
-        if (!report?.file) return;
+        if (report?.file) {
+            const url = URL.createObjectURL(report.file);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = report.name;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            return;
+        }
 
-        const url = URL.createObjectURL(report.file);
-        const link = document.createElement("a");
-
-        link.href = url;
-        link.download = report.name;
-
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-
-        URL.revokeObjectURL(url);
+        if (report?.reportUrl) {
+            const fullUrl = getAssetUrl(report.reportUrl);
+            window.open(fullUrl, "_blank");
+        }
     }
 
-    function sendToAdmin() {
-        if (!report) return;
+    async function sendToAdmin() {
+        const evId = (selectedEvent._id || selectedEvent.id)?.toString();
+        const currentRep = reports[evId];
+        if (!currentRep) return;
 
-        setReports((current) => ({
-            ...current,
-            [selectedEvent.id]: {
-                ...current[selectedEvent.id],
-                sentToAdmin: true,
-            },
-        }));
+        if (currentRep.file) {
+            try {
+                const formData = new FormData();
+                formData.append("file", currentRep.file);
+                formData.append("eventId", evId);
 
-        setToast("Report sent to Admin.");
+                const res = await reportService.uploadReport(formData);
+                const saved = res.data;
+
+                setReports((current) => ({
+                    ...current,
+                    [evId]: {
+                        id: saved._id,
+                        name: saved.reportUrl?.split("/").pop() || currentRep.file.name,
+                        reportUrl: saved.reportUrl,
+                        status: saved.status || "pending",
+                        uploadedAt: saved.uploadedAt || new Date().toISOString(),
+                        uploadedBy: saved.uploadedBy,
+                        sentToAdmin: true,
+                        history: saved.history || [],
+                    },
+                }));
+
+                setToast("Report submitted to Admin successfully.");
+            } catch (err) {
+                alert(err.message || "Failed to send report to Admin.");
+            }
+        } else {
+            setToast("Report already submitted.");
+        }
     }
 
     return (

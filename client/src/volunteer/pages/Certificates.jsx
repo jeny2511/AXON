@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+    Award,
     Check,
     ChevronDown,
     Download,
@@ -9,25 +10,23 @@ import {
     X,
 } from "lucide-react";
 
-import {
-    attendance,
-    events,
-    feedback,
-    registrations,
-    users,
-} from "../../mockData";
+import { eventService } from "../../services/eventService";
+import { registrationService } from "../../services/registrationService";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function getEventStatus(event) {
+    if (!event) return "upcoming";
     const now = new Date();
+    const dateStr = event.eventDate || event.date;
+    if (!dateStr) return "upcoming";
 
     const start = new Date(
-        `${event.eventDate}T${event.startTime}`
+        `${new Date(dateStr).toISOString().split("T")[0]}T${event.startTime || "09:00 AM"}`
     );
 
     const end = new Date(
-        `${event.eventDate}T${event.endTime}`
+        `${new Date(dateStr).toISOString().split("T")[0]}T${event.endTime || "05:00 PM"}`
     );
 
     if (now < start) return "upcoming";
@@ -36,22 +35,30 @@ function getEventStatus(event) {
 }
 
 function formatDate(date) {
-    return new Date(`${date}T00:00:00`).toLocaleDateString(
-        "en-IN",
-        {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-        }
-    );
+    if (!date) return "";
+    try {
+        return new Date(date).toLocaleDateString(
+            "en-IN",
+            {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+            }
+        );
+    } catch {
+        return String(date);
+    }
 }
 
 function Certificates() {
+    const [eventsList, setEventsList] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [search, setSearch] = useState("");
     const [showEvents, setShowEvents] = useState(false);
     const searchRef = useRef(null);
 
+    const [participants, setParticipants] = useState([]);
     const [templates, setTemplates] = useState({});
     const [generated, setGenerated] = useState({});
     const [eligibility, setEligibility] = useState("attendance");
@@ -71,29 +78,66 @@ function Certificates() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const nearestEvent = useMemo(() => {
-        return [...events].sort((a, b) => {
-            const aDate = new Date(
-                `${a.eventDate}T${a.startTime}`
-            ).getTime();
-
-            const bDate = new Date(
-                `${b.eventDate}T${b.startTime}`
-            ).getTime();
-
-            return (
-                Math.abs(aDate - Date.now()) -
-                Math.abs(bDate - Date.now())
-            );
-        })[0];
+    // Load Events from API
+    useEffect(() => {
+        let isMounted = true;
+        async function loadEvents() {
+            try {
+                setLoading(true);
+                const res = await eventService.getEvents();
+                const liveEvents = res?.data || [];
+                if (isMounted) {
+                    setEventsList(liveEvents);
+                    if (liveEvents.length > 0) {
+                        setSelectedEvent(liveEvents[0]);
+                        setSearch(liveEvents[0].name);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to load events for certificates:", err.message);
+                if (isMounted) setEventsList([]);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        }
+        loadEvents();
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
+    // Load Participants for selected event
     useEffect(() => {
-        if (!selectedEvent && nearestEvent) {
-            setSelectedEvent(nearestEvent);
-            setSearch(nearestEvent.name);
+        let isMounted = true;
+        if (selectedEvent) {
+            const eventId = selectedEvent._id || selectedEvent.id;
+            registrationService.getEventRegistrations(eventId).then((res) => {
+                if (isMounted) {
+                    const data = res?.data || [];
+                    const mapped = data.map((r) => {
+                        const student = r.studentId || {};
+                        return {
+                            id: student._id || student.id || r._id,
+                            enrollmentNo: student.enrollmentNo || "N/A",
+                            name: student.fullName || student.name || "Student",
+                            status: r.status,
+                            attended: r.status === "attended",
+                        };
+                    });
+                    setParticipants(mapped);
+                }
+            }).catch((err) => {
+                console.warn("Failed to load participants for certificate generation:", err.message);
+                if (isMounted) setParticipants([]);
+            });
+        } else {
+            setParticipants([]);
         }
-    }, [nearestEvent, selectedEvent]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [selectedEvent]);
 
     useEffect(() => {
         if (!toast) return;
@@ -107,31 +151,29 @@ function Certificates() {
             !search.trim() ||
             (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
         ) {
-            return events;
+            return eventsList;
         }
-        return events.filter((event) =>
+        return eventsList.filter((event) =>
             event.name.toLowerCase().includes(search.toLowerCase())
         );
-    }, [search, selectedEvent]);
+    }, [eventsList, search, selectedEvent]);
 
     const status = selectedEvent
         ? getEventStatus(selectedEvent)
         : "";
 
     const template = selectedEvent
-        ? templates[selectedEvent.id]
+        ? templates[selectedEvent._id || selectedEvent.id]
         : null;
 
     const generatedCertificates = selectedEvent
-        ? generated[selectedEvent.id] || []
+        ? generated[selectedEvent._id || selectedEvent.id] || []
         : [];
 
-    const eligibleStudents = selectedEvent
-        ? getEligibleStudents(
-            selectedEvent.id,
-            eligibility
-        )
-        : [];
+    const eligibleStudents = useMemo(() => {
+        if (!selectedEvent) return [];
+        return participants.filter((p) => p.attended || p.status === "attended");
+    }, [selectedEvent, participants]);
 
     const generatedCount = generatedCertificates.length;
     const totalCount = eligibleStudents.length;
@@ -230,15 +272,27 @@ function Certificates() {
         const allIds = eligibleStudents.map((student) => student.id);
         setGenerated((current) => ({
             ...current,
-            [selectedEvent.id]: allIds,
+            [selectedEvent._id || selectedEvent.id]: allIds,
         }));
         setToast(`Remaining certificates generated. All ${allIds.length} complete!`);
     }
 
-    if (!selectedEvent) {
+    if (loading) {
         return (
-            <div className="p-6 text-sm text-gray-500">
+            <div className="p-8 text-center text-sm text-gray-500">
                 Loading certificates...
+            </div>
+        );
+    }
+
+    if (!selectedEvent || eventsList.length === 0) {
+        return (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
+                <Award size={40} className="mx-auto text-gray-300" />
+                <h3 className="mt-4 font-semibold text-gray-700">No events available</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+                    Create an event in Admin to configure certificate templates and generate participant certificates.
+                </p>
             </div>
         );
     }
@@ -711,43 +765,7 @@ function Certificates() {
     );
 }
 
-function getEligibleStudents(eventId, rule) {
-    const registeredStudentIds = registrations
-        .filter(
-            (registration) =>
-                registration.eventId === eventId &&
-                registration.status === "registered"
-        )
-        .map((registration) => registration.studentId);
 
-    const attendedStudentIds = attendance
-        .filter(
-            (record) =>
-                record.eventId === eventId &&
-                record.status === "present"
-        )
-        .map((record) => record.studentId);
-
-    const feedbackStudentIds = feedback
-        .filter((item) => item.eventId === eventId)
-        .map((item) => item.studentId);
-
-    let eligibleIds = attendedStudentIds.filter((id) =>
-        registeredStudentIds.includes(id)
-    );
-
-    if (rule === "attendance-feedback") {
-        eligibleIds = eligibleIds.filter((id) =>
-            feedbackStudentIds.includes(id)
-        );
-    }
-
-    return users.filter(
-        (user) =>
-            user.role === "student" &&
-            eligibleIds.includes(user.id)
-    );
-}
 
 function ActionBox({ icon, title, text, action }) {
     return (

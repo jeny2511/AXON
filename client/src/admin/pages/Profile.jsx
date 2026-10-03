@@ -12,40 +12,35 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { users } from "../../mockData";
-
-const STORAGE_KEY = "axonAdminProfile";
+import { getCurrentUser, getUserProfile, updateUserProfile, changeUserPassword } from "../../services/authService";
 
 function Profile() {
-  const [admin, setAdmin] = useState(null);
+  const [admin, setAdmin] = useState(getCurrentUser() || null);
   const [formData, setFormData] = useState({});
   const [isEditing, setIsEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedAdmin = localStorage.getItem(STORAGE_KEY);
+    let mounted = true;
+    getUserProfile()
+      .then((res) => {
+        if (mounted && res && res.data) {
+          setAdmin(res.data);
+          setFormData(res.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load admin profile:", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
-    if (storedAdmin) {
-      const parsedAdmin = JSON.parse(storedAdmin);
-      setAdmin(parsedAdmin);
-      setFormData(parsedAdmin);
-      return;
-    }
-
-    const defaultAdmin = users.find(
-      (user) => user.role === "admin"
-    );
-
-    if (defaultAdmin) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(defaultAdmin)
-      );
-
-      setAdmin(defaultAdmin);
-      setFormData(defaultAdmin);
-    }
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleChange = (e) => {
@@ -77,53 +72,55 @@ function Profile() {
   };
 
   const handleEdit = () => {
-    setFormData(admin);
+    setFormData(admin || {});
     setMessage("");
     setIsEditing(true);
   };
 
   const handleCancel = () => {
-    setFormData(admin);
+    setFormData(admin || {});
     setMessage("");
     setIsEditing(false);
     setShowPassword(false);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
 
     if (
       !formData.fullName?.trim() ||
       !formData.email?.trim() ||
-      !formData.phone?.trim() ||
-      !formData.department
+      !formData.phone?.trim()
     ) {
       alert("Please fill all required fields.");
       return;
     }
 
-    const updatedAdmin = {
-      ...admin,
-      ...formData,
-      fullName: formData.fullName.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-    };
+    try {
+      const payload = {
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        department: formData.department,
+        designation: formData.designation,
+        committee: formData.committee,
+        profilePhoto: formData.profilePhoto,
+      };
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(updatedAdmin)
-    );
+      const res = await updateUserProfile(payload);
+      const updated = res.data || { ...admin, ...payload };
+      setAdmin(updated);
+      setFormData(updated);
+      setIsEditing(false);
+      setShowPassword(false);
+      setMessage("Profile updated successfully.");
 
-    setAdmin(updatedAdmin);
-    setFormData(updatedAdmin);
-    setIsEditing(false);
-    setShowPassword(false);
-    setMessage("Profile updated successfully.");
-
-    setTimeout(() => {
-      setMessage("");
-    }, 2500);
+      setTimeout(() => {
+        setMessage("");
+      }, 2500);
+    } catch (err) {
+      alert(err.message || "Failed to update profile");
+    }
   };
 
   if (!admin) {
@@ -208,7 +205,7 @@ function Profile() {
             </p>
 
             <div className="profile-id">
-              Admin ID: <strong>{admin.id}</strong>
+              Admin ID: <strong>{admin.id || admin._id}</strong>
             </div>
           </div>
         </div>
@@ -443,7 +440,7 @@ function Profile() {
             <div className="profile-account-grid">
               <div>
                 <span>Account ID</span>
-                <strong>{admin.id}</strong>
+                <strong>{admin.id || admin._id}</strong>
               </div>
 
               <div>

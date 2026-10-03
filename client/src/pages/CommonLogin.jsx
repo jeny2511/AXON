@@ -11,7 +11,11 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { loginUser, registerStudent } from "../services/authService";
+import {
+  loginUser,
+  registerStudent,
+  sendRegistrationOtp,
+} from "../services/authService";
 
 export default function CommonLogin() {
   const navigate = useNavigate();
@@ -101,7 +105,7 @@ export default function CommonLogin() {
     setError("");
   };
 
-  const handleSignInSubmit = (e) => {
+  const handleSignInSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -111,7 +115,7 @@ export default function CommonLogin() {
 
     // Frontend validation: username is required
     if (!username) {
-      setError("Please enter your Username, Enrollment Number, or Email ID.");
+      setError("Please enter your Email ID or Enrollment Number.");
       return;
     }
 
@@ -123,8 +127,8 @@ export default function CommonLogin() {
 
     setLoading(true);
     try {
-      const user = loginUser({
-        username,
+      const user = await loginUser({
+        identifier: username,
         password,
       });
       navigate(getDestinationPath(user.role));
@@ -184,7 +188,7 @@ export default function CommonLogin() {
     }));
   };
 
-  const handleGetOtp = () => {
+  const handleGetOtp = async () => {
     setError("");
     const email = registerData.email.trim();
     if (!email) {
@@ -196,14 +200,16 @@ export default function CommonLogin() {
       return;
     }
 
-    setOtpSent(true);
-    // Simulate OTP generation and auto-fill for frictionless UX
-    const sampleOtp = "849201";
-    setRegisterData((prev) => ({ ...prev, otp: sampleOtp }));
-    setSuccessMsg(`OTP sent to ${email}! (Test OTP: ${sampleOtp})`);
+    try {
+      const res = await sendRegistrationOtp(email);
+      setOtpSent(true);
+      setSuccessMsg(res.message || `OTP sent to ${email}!`);
+    } catch (err) {
+      setError(err.message || "Failed to send OTP.");
+    }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccessMsg("");
@@ -238,11 +244,6 @@ export default function CommonLogin() {
       return;
     }
 
-    if (!otp.trim()) {
-      setError("Please enter the OTP sent to your email.");
-      return;
-    }
-
     if (!password || password.length < 6) {
       setError("Password must be at least 6 characters long.");
       return;
@@ -253,7 +254,7 @@ export default function CommonLogin() {
       return;
     }
 
-    if (!phone.trim() || !/^[6-9]\d{9}$/.test(phone.trim())) {
+    if (!phone.trim() || !/^[0-9]{10}$/.test(phone.trim())) {
       setError("Please enter a valid 10-digit Indian phone number.");
       return;
     }
@@ -261,16 +262,21 @@ export default function CommonLogin() {
     setLoading(true);
     try {
       const yearNumber = parseInt(year) || 3;
-      const newStudent = registerStudent({
+      const newStudent = await registerStudent({
         fullName: fullName.trim(),
+        enrollmentNumber: enrollmentNo.trim(),
         enrollmentNo: enrollmentNo.trim(),
         email: email.trim(),
         password,
+        confirmPassword,
         department,
+        admissionType: courseType.toLowerCase(),
         courseType,
         batch,
         year: yearNumber,
+        phoneNumber: phone.trim(),
         phone: phone.trim(),
+        otp: otp ? otp.trim() : undefined,
       });
 
       navigate(getDestinationPath(newStudent.role));
@@ -279,6 +285,7 @@ export default function CommonLogin() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#f8f9fe] flex flex-col items-center justify-center p-4 sm:p-6 font-sans antialiased text-gray-900">
@@ -357,17 +364,17 @@ export default function CommonLogin() {
         {/* ======================================================== */}
         {activeTab === "signin" && (
           <form onSubmit={handleSignInSubmit} className="space-y-4">
-            {/* Username */}
+            {/* Email or Enrollment Number */}
             <div>
               <label className="block text-xs font-semibold text-gray-800 mb-1.5">
-                Username
+                Email or Enrollment Number
               </label>
               <input
                 type="text"
                 name="username"
                 value={signInData.username}
                 onChange={handleSignInChange}
-                placeholder="Enter your username"
+                placeholder="Enter Email or Enrollment No (e.g. 24IT001 / admin@axon.edu)"
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#7040d0] transition-colors"
               />
             </div>

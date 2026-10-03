@@ -15,6 +15,12 @@ const gallerySchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event",
+      default: null,
+      index: true,
+    },
     venue: {
       type: String,
       trim: true,

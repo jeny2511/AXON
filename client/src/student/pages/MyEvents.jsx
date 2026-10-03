@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./pages.css";
 import "./MyEvents.css";
 
@@ -8,6 +8,12 @@ import EmptyState from "../components/EmptyState/EmptyState";
 import CertificateView from "../components/CertificateView";
 
 import {
+  fetchMyRegistrationsApi,
+  fetchMyAttendanceApi,
+  fetchMyFeedbackApi,
+  fetchMyCertificatesApi,
+  submitFeedbackApi,
+  cancelRegistrationApi,
   getActiveStudentId,
   getStudentProfile,
   getStudentRegistrations,
@@ -17,6 +23,7 @@ import {
   hasSubmittedFeedback,
   submitStudentFeedback,
 } from "../services/studentService";
+import { getAttendanceWindowInfo } from "../utils/eventLifecycle";
 
 function MyEvents() {
   const studentId = getActiveStudentId();
@@ -26,20 +33,80 @@ function MyEvents() {
     enrollmentNo: "220130107054",
   };
 
-  const registrations = getStudentRegistrations(studentId);
+  const [myEvents, setMyEvents] = useState([]);
+  const [myAttendance, setMyAttendance] = useState([]);
+  const [myFeedbacks, setMyFeedbacks] = useState([]);
+  const [myCertificates, setMyCertificates] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const myEvents = registrations
-    .map((registration) => {
-      const event = getEventById(registration.eventId);
-      if (!event) return null;
-      return {
-        ...event,
-        registrationId: registration.registrationId,
-        registrationStatus: registration.status,
-        qrCode: registration.qrCode,
-      };
-    })
-    .filter(Boolean);
+  const loadMyEvents = async () => {
+    try {
+      setLoading(true);
+      const [regs, attendances, fbs, certs] = await Promise.allSettled([
+        fetchMyRegistrationsApi(),
+        fetchMyAttendanceApi(),
+        fetchMyFeedbackApi(),
+        fetchMyCertificatesApi(),
+      ]);
+
+      const regsData = regs.status === "fulfilled" ? (regs.value || []) : [];
+      const attsData = attendances.status === "fulfilled" ? (attendances.value || []) : [];
+      const fbsData = fbs.status === "fulfilled" ? (fbs.value || []) : [];
+      const certsData = certs.status === "fulfilled" ? (certs.value || []) : [];
+
+      setMyAttendance(attsData);
+      setMyFeedbacks(fbsData);
+      setMyCertificates(certsData);
+
+      const mapped = regsData
+        .filter((r) => {
+          const ev = r.event || {};
+          const eventId = ev._id || ev.id || r.eventId;
+          const matchingAtt = attsData.find(
+            (a) => (a.eventId?._id || a.eventId?.id || a.eventId) === eventId
+          );
+          // Only show events where student is verified present
+          return matchingAtt && matchingAtt.status === "present";
+        })
+        .map((r) => {
+          const ev = r.event || {};
+          const eventId = ev._id || ev.id || r.eventId;
+          const matchingAtt = attsData.find(
+            (a) => (a.eventId?._id || a.eventId?.id || a.eventId) === eventId
+          );
+          const matchingFb = fbsData.find(
+            (f) => (f.eventId?._id || f.eventId?.id || f.eventId) === eventId
+          );
+          const matchingCert = certsData.find(
+            (c) => (c.eventId?._id || c.eventId?.id || c.eventId) === eventId
+          );
+
+          return {
+            ...ev,
+            id: eventId,
+            _id: eventId,
+            registrationId: r.id || r._id,
+            registrationStatus: r.status,
+            qrCode: r.qrToken || r.qrCode,
+            qrToken: r.qrToken || r.qrCode,
+            attendanceStatus: "present",
+            attendanceRecord: matchingAtt,
+            feedbackDone: Boolean(matchingFb),
+            certificate: matchingCert || null,
+          };
+        });
+      setMyEvents(mapped);
+    } catch (err) {
+      console.warn("Failed to load my events:", err.message);
+      setMyEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMyEvents();
+  }, [studentId]);
 
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [selectedFeedbackEvent, setSelectedFeedbackEvent] = useState(null);
@@ -58,11 +125,13 @@ function MyEvents() {
 
   // Open Certificate for specific event
   const handleCertificate = (event) => {
-    const cert = getStudentCertificateForEvent(student.id, event.id);
+    const cert = event.certificate || getStudentCertificateForEvent(student.id, event.id);
     if (cert) {
       setSelectedCertificate({
         ...cert,
         eventName: event.name,
+        studentName: cert.studentName || student.fullName,
+        enrollmentNo: cert.enrollmentNumber || student.enrollmentNo,
       });
     }
   };
@@ -72,10 +141,28 @@ function MyEvents() {
     setSelectedQREvent(event);
   };
 
+  // Cancel Event Registration
+  const handleCancelRegistration = async (registrationId) => {
+    if (window.confirm("Are you sure you want to cancel this event registration?")) {
+      try {
+        await cancelRegistrationApi(registrationId);
+        loadMyEvents();
+      } catch (err) {
+        alert(err.message || "Failed to cancel registration.");
+      }
+    }
+  };
+
   // Open Feedback Modal for specific event
   const handleFeedback = (event) => {
+    const attStatus = event.attendanceStatus || (getStudentAttendanceForEvent(student.id, event.id)?.status) || "pending";
+    if (attStatus !== "present") {
+      alert("Feedback is only available after your attendance is marked as Present.");
+      return;
+    }
+
     setSelectedFeedbackEvent(event);
-    const alreadyDone = hasSubmittedFeedback(student.id, event.id);
+    const alreadyDone = event.feedbackDone || hasSubmittedFeedback(student.id, event.id);
     setFeedbackSubmitted(alreadyDone);
     setFeedbackError("");
 
@@ -97,23 +184,35 @@ function MyEvents() {
     setFeedbackError("");
   };
 
-  const handleFeedbackSubmit = (e) => {
+  const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
 
     if (
       !feedbackData.overallRating ||
       !feedbackData.contentRating ||
-      !feedbackData.speakerRating ||
-      !feedbackData.comment.trim()
+      !feedbackData.speakerRating
     ) {
-      setFeedbackError("Please complete all required rating and comment fields.");
+      setFeedbackError("Please complete all required rating fields.");
       return;
     }
 
-    submitStudentFeedback(student.id, selectedFeedbackEvent.id, feedbackData);
+    try {
+      await submitFeedbackApi({
+        eventId: selectedFeedbackEvent.id || selectedFeedbackEvent._id,
+        overallRating: Number(feedbackData.overallRating),
+        contentRating: Number(feedbackData.contentRating),
+        speakerRating: Number(feedbackData.speakerRating),
+        organizationRating: 5,
+        comment: feedbackData.comment || "",
+        wouldRecommend: Boolean(feedbackData.wouldRecommend),
+      });
 
-    setFeedbackError("");
-    setFeedbackSubmitted(true);
+      setFeedbackError("");
+      setFeedbackSubmitted(true);
+      loadMyEvents();
+    } catch (err) {
+      setFeedbackError(err.message || "Failed to submit feedback.");
+    }
   };
 
   const closeFeedback = () => {
@@ -135,11 +234,10 @@ function MyEvents() {
         {myEvents.length > 0 ? (
           <div className="my-events-grid">
             {myEvents.map((event) => {
-              const attRecord = getStudentAttendanceForEvent(student.id, event.id);
-              const attendanceStatus = attRecord ? attRecord.status : "pending";
-              const cert = getStudentCertificateForEvent(student.id, event.id);
+              const attendanceStatus = event.attendanceStatus || (getStudentAttendanceForEvent(student.id, event.id)?.status) || "pending";
+              const cert = event.certificate || getStudentCertificateForEvent(student.id, event.id);
               const isPresent = attendanceStatus === "present";
-              const feedbackDone = hasSubmittedFeedback(student.id, event.id);
+              const feedbackDone = Boolean(event.feedbackDone || hasSubmittedFeedback(student.id, event.id));
 
               return (
                 <div className="my-event-wrapper" key={event.id || event.registrationId}>
@@ -184,23 +282,93 @@ function MyEvents() {
 
                   {/* Actions Grid */}
                   <div className="my-event-extra-actions">
-                    <button
-                      type="button"
-                      className="qr-btn"
-                      style={{
-                        background: "#4f46e5",
-                        color: "#ffffff",
-                        padding: "9px 14px",
-                        borderRadius: "8px",
-                        border: "none",
-                        fontWeight: "600",
-                        fontSize: "13px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleViewQR(event)}
-                    >
-                      Show QR
-                    </button>
+                    {(() => {
+                      const windowInfo = getAttendanceWindowInfo(event);
+                      if (isPresent) {
+                        return (
+                          <button
+                            type="button"
+                            className="qr-btn"
+                            style={{
+                              background: "#16a34a",
+                              color: "#ffffff",
+                              padding: "9px 14px",
+                              borderRadius: "8px",
+                              border: "none",
+                              fontWeight: "600",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                            onClick={() => handleViewQR(event)}
+                          >
+                            Pass Verified ✓
+                          </button>
+                        );
+                      }
+                      if (windowInfo.isBefore) {
+                        return (
+                          <button
+                            type="button"
+                            className="qr-btn"
+                            style={{
+                              background: "#fef3c7",
+                              color: "#92400e",
+                              border: "1px solid #fde68a",
+                              padding: "9px 14px",
+                              borderRadius: "8px",
+                              fontWeight: "600",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                            title={`Attendance window opens: ${windowInfo.openTime ? windowInfo.openTime.toLocaleString() : "TBA"}`}
+                            onClick={() => handleViewQR(event)}
+                          >
+                            Window Pending ⏳
+                          </button>
+                        );
+                      }
+                      if (windowInfo.isAfter) {
+                        return (
+                          <button
+                            type="button"
+                            className="qr-btn"
+                            style={{
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              border: "1px solid #fecaca",
+                              padding: "9px 14px",
+                              borderRadius: "8px",
+                              fontWeight: "600",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                            }}
+                            title={`Attendance window closed: ${windowInfo.closeTime ? windowInfo.closeTime.toLocaleString() : "TBA"}`}
+                            onClick={() => handleViewQR(event)}
+                          >
+                            Window Closed ⛔
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          className="qr-btn"
+                          style={{
+                            background: "#4f46e5",
+                            color: "#ffffff",
+                            padding: "9px 14px",
+                            borderRadius: "8px",
+                            border: "none",
+                            fontWeight: "600",
+                            fontSize: "13px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => handleViewQR(event)}
+                        >
+                          Show QR ▦
+                        </button>
+                      );
+                    })()}
 
                     <button
                       type="button"
@@ -225,15 +393,42 @@ function MyEvents() {
                     <button
                       type="button"
                       className="feedback-btn"
-                      disabled={!isPresent && event.status === "upcoming"}
+                      disabled={!isPresent}
                       style={{
-                        opacity: !isPresent && event.status === "upcoming" ? 0.5 : 1,
-                        cursor: !isPresent && event.status === "upcoming" ? "not-allowed" : "pointer",
+                        opacity: isPresent ? 1 : 0.5,
+                        cursor: isPresent ? "pointer" : "not-allowed",
                       }}
+                      title={
+                        !isPresent
+                          ? "Feedback is available after your attendance is verified as Present."
+                          : feedbackDone
+                          ? "Feedback Submitted"
+                          : "Give Feedback"
+                      }
                       onClick={() => handleFeedback(event)}
                     >
                       {feedbackDone ? "Feedback ✓" : "Feedback"}
                     </button>
+
+                    {event.registrationId && (
+                      <button
+                        type="button"
+                        style={{
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          padding: "9px 12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          fontWeight: "600",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                        }}
+                        title="Cancel Registration"
+                        onClick={() => handleCancelRegistration(event.registrationId)}
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -241,87 +436,263 @@ function MyEvents() {
           </div>
         ) : (
           <EmptyState
-            title="No Events Yet"
-            message="Your registered and attended events will appear here once you register."
+            title="No Attended Events Yet"
+            message="Events you have attended will appear here once your attendance has been verified as Present."
           />
         )}
       </div>
 
       {/* QR ATTENDANCE MODAL */}
-      {selectedQREvent && (
-        <div
-          className="feedback-modal-overlay"
-          onClick={() => setSelectedQREvent(null)}
-          style={{ zIndex: 9999 }}
-        >
+      {selectedQREvent && (() => {
+        const qrToken = selectedQREvent.qrToken || selectedQREvent.qrCode || `QR-${selectedQREvent.id}-${student.id}`;
+        const windowInfo = getAttendanceWindowInfo(selectedQREvent);
+        const isPresent = selectedQREvent.attendanceStatus === "present";
+
+        return (
           <div
-            className="feedback-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{ textAlign: "center", maxWidth: "440px" }}
+            className="feedback-modal-overlay"
+            onClick={() => setSelectedQREvent(null)}
+            style={{ zIndex: 9999 }}
           >
-            <button
-              type="button"
-              className="feedback-close"
-              onClick={() => setSelectedQREvent(null)}
-              aria-label="Close"
-            >
-              ×
-            </button>
-
-            <h2 style={{ color: "#1f1f29", marginBottom: "6px" }}>Event Attendance QR</h2>
-            <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>
-              {selectedQREvent.name}
-            </p>
-
             <div
-              style={{
-                width: "180px",
-                height: "180px",
-                margin: "0 auto 20px",
-                padding: "16px",
-                background: "#f8fafc",
-                borderRadius: "16px",
-                border: "2px dashed #6a3bc5",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
+              className="feedback-modal"
+              onClick={(e) => e.stopPropagation()}
+              style={{ textAlign: "center", maxWidth: "440px" }}
             >
-              <div style={{ fontSize: "64px", color: "#6a3bc5", lineHeight: 1 }}>▦</div>
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#4f46e5", marginTop: "8px" }}>
-                {selectedQREvent.qrCode || `QR-${selectedQREvent.id}-${student.id}`}
-              </span>
-            </div>
+              <button
+                type="button"
+                className="feedback-close"
+                onClick={() => setSelectedQREvent(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
 
-            <div
-              style={{
-                background: "#f1f5f9",
-                borderRadius: "10px",
-                padding: "12px",
-                fontSize: "13px",
-                color: "#334155",
-                textAlign: "left",
-                marginBottom: "16px",
-              }}
-            >
-              <p style={{ margin: "4px 0" }}>
-                <strong>Student:</strong> {student.fullName}
+              <h2 style={{ color: "#1f1f29", marginBottom: "6px" }}>Event Attendance Pass</h2>
+              <p style={{ color: "#666", fontSize: "14px", marginBottom: "16px" }}>
+                {selectedQREvent.name}
               </p>
-              <p style={{ margin: "4px 0" }}>
-                <strong>Enrollment No:</strong> {student.enrollmentNo || "220130107054"}
-              </p>
-              <p style={{ margin: "4px 0" }}>
-                <strong>Event Date:</strong> {selectedQREvent.eventDate}
+
+              {/* Attendance Window Status Badge */}
+              <div style={{ marginBottom: "16px" }}>
+                {isPresent ? (
+                  <span style={{
+                    display: "inline-block",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    background: "#dcfce7",
+                    color: "#166534",
+                    border: "1px solid #bbf7d0"
+                  }}>
+                    ✓ Attendance Verified — Present
+                  </span>
+                ) : windowInfo.isBefore ? (
+                  <span style={{
+                    display: "inline-block",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    background: "#fef3c7",
+                    color: "#92400e",
+                    border: "1px solid #fde68a"
+                  }}>
+                    ⏳ Attendance window not open yet
+                  </span>
+                ) : windowInfo.isAfter ? (
+                  <span style={{
+                    display: "inline-block",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    background: "#fee2e2",
+                    color: "#b91c1c",
+                    border: "1px solid #fecaca"
+                  }}>
+                    ⛔ Attendance window closed
+                  </span>
+                ) : (
+                  <span style={{
+                    display: "inline-block",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    background: "#dcfce7",
+                    color: "#166534",
+                    border: "1px solid #bbf7d0"
+                  }}>
+                    ✓ Attendance is open — Ready to Scan
+                  </span>
+                )}
+              </div>
+
+              {/* QR Container / Lock Container */}
+              {isPresent ? (
+                <div
+                  style={{
+                    width: "220px",
+                    height: "180px",
+                    margin: "0 auto 16px",
+                    padding: "16px",
+                    background: "#f0fdf4",
+                    borderRadius: "16px",
+                    border: "2px solid #86efac",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ fontSize: "48px", color: "#16a34a", marginBottom: "8px" }}>✓</div>
+                  <div style={{ fontSize: "14px", fontWeight: "700", color: "#166534" }}>
+                    Attendance Verified
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#15803d", marginTop: "4px" }}>
+                    Status: Present
+                  </div>
+                </div>
+              ) : windowInfo.isBefore ? (
+                <div
+                  style={{
+                    width: "220px",
+                    height: "180px",
+                    margin: "0 auto 16px",
+                    padding: "16px",
+                    background: "#fffbeb",
+                    borderRadius: "16px",
+                    border: "2px dashed #fcd34d",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ fontSize: "38px", color: "#d97706", marginBottom: "8px" }}>🔒</div>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e" }}>
+                    QR Code Locked
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#b45309", marginTop: "6px", textAlign: "center" }}>
+                    Opens: {windowInfo.openTime ? windowInfo.openTime.toLocaleString() : "At event start"}
+                  </div>
+                </div>
+              ) : windowInfo.isAfter ? (
+                <div
+                  style={{
+                    width: "220px",
+                    height: "180px",
+                    margin: "0 auto 16px",
+                    padding: "16px",
+                    background: "#fef2f2",
+                    borderRadius: "16px",
+                    border: "2px dashed #fca5a5",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ fontSize: "38px", color: "#dc2626", marginBottom: "8px" }}>⛔</div>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#991b1b" }}>
+                    QR Code Inactive
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#b91c1c", marginTop: "6px", textAlign: "center" }}>
+                    Window closed: {windowInfo.closeTime ? windowInfo.closeTime.toLocaleString() : "Past"}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      width: "210px",
+                      height: "210px",
+                      margin: "0 auto 16px",
+                      padding: "10px",
+                      background: "#ffffff",
+                      borderRadius: "16px",
+                      border: "2px solid #6366f1",
+                      boxShadow: "0 8px 24px rgba(99, 102, 241, 0.15)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrToken)}`}
+                      alt="Attendance QR Code"
+                      style={{ width: "190px", height: "190px", display: "block" }}
+                    />
+                  </div>
+
+                  <div style={{
+                    fontFamily: "monospace",
+                    fontSize: "12px",
+                    fontWeight: "700",
+                    color: "#475569",
+                    background: "#f1f5f9",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    marginBottom: "16px",
+                    wordBreak: "break-all"
+                  }}>
+                    {qrToken}
+                  </div>
+                </>
+              )}
+
+              <div
+                style={{
+                  background: "#f8fafc",
+                  borderRadius: "10px",
+                  padding: "12px",
+                  fontSize: "13px",
+                  color: "#334155",
+                  textAlign: "left",
+                  marginBottom: "16px",
+                  border: "1px solid #e2e8f0"
+                }}
+              >
+                <p style={{ margin: "3px 0" }}>
+                  <strong>Student:</strong> {student.fullName}
+                </p>
+                <p style={{ margin: "3px 0" }}>
+                  <strong>Enrollment No:</strong> {student.enrollmentNo || "220130107054"}
+                </p>
+                <p style={{ margin: "3px 0" }}>
+                  <strong>Event Date:</strong> {selectedQREvent.eventDate || selectedQREvent.date ? new Date(selectedQREvent.eventDate || selectedQREvent.date).toLocaleDateString("en-IN") : "N/A"}
+                </p>
+                <p style={{ margin: "3px 0" }}>
+                  <strong>Attendance Status:</strong>{" "}
+                  <span style={{
+                    fontWeight: "700",
+                    color: selectedQREvent.attendanceStatus === "present" ? "#16a34a" : "#d97706"
+                  }}>
+                    {selectedQREvent.attendanceStatus === "present" ? "Present ✓" : "Pending Verification"}
+                  </span>
+                </p>
+              </div>
+
+              <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                {windowInfo.isOpen && !isPresent
+                  ? "Present this QR token to the TCF Volunteer at the event venue."
+                  : windowInfo.isBefore
+                  ? "Attendance QR will be generated and visible once the window opens."
+                  : isPresent
+                  ? "Attendance successfully recorded for this event."
+                  : "Attendance window has closed."}
               </p>
             </div>
-
-            <p style={{ fontSize: "12px", color: "#777", margin: 0 }}>
-              Show this QR code to the Volunteer at the event venue to mark your attendance.
-            </p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* CERTIFICATE MODAL */}
       {selectedCertificate && (

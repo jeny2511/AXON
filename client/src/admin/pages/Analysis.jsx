@@ -1,437 +1,221 @@
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   CalendarDays,
   MessageSquareText,
   Users,
+  Award,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle,
+  TrendingUp,
 } from "lucide-react";
-
-import {
-  events,
-  users,
-  registrations,
-  feedback,
-} from "../../mockData";
+import { adminService } from "../../services/adminService";
 
 function Analysis() {
-  // -----------------------------
-  // BASIC COUNTS
-  // -----------------------------
+  const [analysisData, setAnalysisData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const totalRegistrations = registrations.filter(
-    (registration) => registration.status === "registered"
-  ).length;
-
-  const totalEvents = events.length;
-
-  // Average participation
-  const averageParticipation =
-    events.length > 0
-      ? Math.round(
-          events.reduce((total, event) => {
-            const percentage =
-              event.participantLimit > 0
-                ? (event.registeredCount / event.participantLimit) * 100
-                : 0;
-
-            return total + percentage;
-          }, 0) / events.length
-        )
-      : 0;
-
-  // -----------------------------
-  // RECENT 5 EVENTS
-  // -----------------------------
-
-  const recentEvents = [...events]
-    .sort(
-      (a, b) =>
-        new Date(b.eventDate) - new Date(a.eventDate)
-    )
-    .slice(0, 5);
-
-  // Feedback average for each recent event
-  const feedbackData = recentEvents.map((event) => {
-    const eventFeedback = feedback.filter(
-      (item) => item.eventId === event.id
-    );
-
-    const average =
-      eventFeedback.length > 0
-        ? eventFeedback.reduce(
-            (sum, item) =>
-              sum + Number(
-                item.overallRating ?? item.rating ?? item.feedbackRating ?? item.ratingValue ?? 0
-              ),
-            0
-          ) / eventFeedback.length
-        : 0;
-
-    return {
-      ...event,
-      averageFeedback: Number(average.toFixed(1)),
-    };
-  });
-
-  // -----------------------------
-  // DEPARTMENT PARTICIPATION
-  // -----------------------------
-
-  const students = users.filter(
-    (user) => user.role === "student"
-  );
-
-  const departmentCounts = {};
-
-  registrations
-    .filter(
-      (registration) =>
-        registration.status === "registered"
-    )
-    .forEach((registration) => {
-      const student = students.find(
-        (user) => user.id === registration.studentId
-      );
-
-      if (student) {
-        departmentCounts[student.department] =
-          (departmentCounts[student.department] || 0) + 1;
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      try {
+        setLoading(true);
+        const res = await adminService.getSystemAnalysis();
+        setAnalysisData(res.data || {});
+        setError(null);
+      } catch (err) {
+        console.error("Failed to load system analysis:", err);
+        setError(err.message || "Failed to load analytics.");
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-  const totalDepartmentRegistrations =
-    Object.values(departmentCounts).reduce(
-      (sum, value) => sum + value,
-      0
-    );
+    fetchAnalysis();
+  }, []);
 
-  const departmentData = Object.entries(
-    departmentCounts
-  )
-    .map(([department, count]) => ({
-      department,
-      count,
-      percentage:
-        totalDepartmentRegistrations > 0
-          ? Math.round(
-              (count / totalDepartmentRegistrations) * 100
-            )
-          : 0,
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  // -----------------------------
-  // HELPERS
-  // -----------------------------
-
-  const getFeedbackColor = (rating) => {
-    if (rating >= 4.5) return "excellent";
-    if (rating >= 3.5) return "good";
-    if (rating > 0) return "average";
-    return "no-feedback";
-  };
+  const totalStudents = analysisData?.totalStudents || 0;
+  const totalVolunteers = analysisData?.totalVolunteers || 0;
+  const totalRegistrations = analysisData?.totalRegistrations || 0;
+  const totalEvents = analysisData?.totalEvents || 0;
+  const totalAttendance = analysisData?.totalAttendance || 0;
+  const averageParticipation = analysisData?.overallAttendanceRate || 0;
+  const totalFeedback = analysisData?.totalFeedback || 0;
+  const totalCertificates = analysisData?.totalCertificates || 0;
+  const events = analysisData?.eventsPerformance || [];
 
   return (
     <main className="dashboard analysis-page">
-
       {/* PAGE HEADER */}
       <div className="page-heading analysis-heading">
         <div>
           <h2>Analytics & Insights</h2>
-          <p>
-            Analyze event participation and student feedback
-          </p>
+          <p>Live operational and participation metrics from system database</p>
         </div>
       </div>
 
-      {/* =========================================
-          SUMMARY CARDS
-          ========================================= */}
-
-      <section className="analysis-stat-grid">
-
-        <div className="analysis-stat-card">
-          <div className="analysis-stat-icon">
-            <Users size={20} />
-          </div>
-
-          <div>
-            <span>Total Registrations</span>
-            <strong>{totalRegistrations}</strong>
-          </div>
+      {error && (
+        <div style={{ color: "#ef4444", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
         </div>
+      )}
 
-        <div className="analysis-stat-card">
-          <div className="analysis-stat-icon">
-            <CalendarDays size={20} />
-          </div>
-
-          <div>
-            <span>Total Events</span>
-            <strong>{totalEvents}</strong>
-          </div>
+      {loading ? (
+        <div style={{ padding: "3rem", textAlign: "center", color: "#94a3b8" }}>
+          <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 0.5rem" }} />
+          <p>Calculating live system analytics...</p>
         </div>
-
-        <div className="analysis-stat-card">
-          <div className="analysis-stat-icon">
-            <BarChart3 size={20} />
-          </div>
-
-          <div>
-            <span>Average Participation</span>
-            <strong>{averageParticipation}%</strong>
-          </div>
-        </div>
-
-      </section>
-
-      {/* =========================================
-          FEEDBACK ANALYSIS
-          ========================================= */}
-
-      <section className="analysis-panel feedback-panel">
-
-        <div className="analysis-panel-header">
-          <div>
-            <h3>Recent 5 Events — Feedback Analysis</h3>
-            <p>
-              Average feedback rating for the latest events
-            </p>
-          </div>
-
-          <MessageSquareText size={20} />
-        </div>
-
-        <div className="feedback-chart">
-
-          <div className="feedback-y-axis">
-            <span>5</span>
-            <span>4</span>
-            <span>3</span>
-            <span>2</span>
-            <span>1</span>
-          </div>
-
-          <div className="feedback-chart-area">
-
-            <div className="feedback-grid-lines">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-
-            <div className="feedback-bars">
-
-              {feedbackData.map((event) => {
-                const height =
-                  event.averageFeedback > 0
-                    ? (event.averageFeedback / 5) * 100
-                    : 4;
-
-                return (
-                  <div
-                    className="feedback-bar-column"
-                    key={event.id}
-                  >
-                    <div className="feedback-value">
-                      {event.averageFeedback > 0
-                        ? event.averageFeedback
-                        : "N/A"}
-                    </div>
-
-                    <div className="feedback-bar-wrapper">
-
-                      <div
-                        className={`feedback-bar ${getFeedbackColor(
-                          event.averageFeedback
-                        )}`}
-                        style={{
-                          height: `${height}%`,
-                        }}
-                      ></div>
-
-                    </div>
-
-                    <span className="feedback-event-name">
-                      {event.name}
-                    </span>
-                  </div>
-                );
-              })}
-
-            </div>
-          </div>
-        </div>
-
-        <div className="feedback-scale">
-          <span>1</span>
-          <span>Very Poor</span>
-          <span>3</span>
-          <span>Average</span>
-          <span>5</span>
-          <span>Excellent</span>
-        </div>
-
-      </section>
-
-      {/* =========================================
-          DEPARTMENT PARTICIPATION
-          ========================================= */}
-
-      <section className="analysis-panel department-panel">
-
-        <div className="analysis-panel-header">
-          <div>
-            <h3>Department Participation</h3>
-            <p>
-              Student participation based on registrations
-            </p>
-          </div>
-
-          <Users size={20} />
-        </div>
-
-        <div className="department-content">
-
-          <div className="department-chart">
-            <div
-              className="department-donut"
-              style={{
-                background: `conic-gradient(
-                  #6538bd 0% 48%,
-                  #8c63d8 48% 76%,
-                  #b79be9 76% 93%,
-                  #d9c9f4 93% 100%
-                )`,
-              }}
-            >
-              <div className="department-donut-center">
-                <strong>
-                  {totalDepartmentRegistrations}
-                </strong>
-                <span>Students</span>
+      ) : (
+        <>
+          {/* SUMMARY CARDS */}
+          <section className="analysis-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <Users size={20} />
+              </div>
+              <div>
+                <span>Total Students</span>
+                <strong>{totalStudents}</strong>
               </div>
             </div>
-          </div>
 
-          <div className="department-list">
-
-            {departmentData.map((item, index) => (
-              <div
-                className="department-item"
-                key={item.department}
-              >
-
-                <div className="department-item-top">
-
-                  <div className="department-name">
-                    <span
-                      className={`department-dot dot-${index}`}
-                    ></span>
-
-                    <strong>{item.department}</strong>
-                  </div>
-
-                  <span>
-                    {item.percentage}%
-                  </span>
-
-                </div>
-
-                <div className="department-track">
-                  <div
-                    className={`department-fill fill-${index}`}
-                    style={{
-                      width: `${item.percentage}%`,
-                    }}
-                  ></div>
-                </div>
-
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <Users size={20} />
               </div>
-            ))}
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* =========================================
-          EVENT PERFORMANCE LIST
-          ========================================= */}
-
-      <section className="analysis-panel event-performance-panel">
-
-        <div className="analysis-panel-header">
-          <div>
-            <h3>Event Performance</h3>
-            <p>
-              Registration and participation for all events
-            </p>
-          </div>
-
-          <CalendarDays size={20} />
-        </div>
-
-        <div className="event-performance-list">
-
-          {events.map((event) => {
-
-            const participation =
-              event.participantLimit > 0
-                ? Math.round(
-                    (event.registeredCount /
-                      event.participantLimit) *
-                      100
-                  )
-                : 0;
-
-            return (
-              <div
-                className="event-performance-item"
-                key={event.id}
-              >
-
-                <div className="event-performance-main">
-
-                  <div className="event-performance-icon">
-                    <CalendarDays size={17} />
-                  </div>
-
-                  <div>
-                    <h4>{event.name}</h4>
-
-                    <span>
-                      {event.id} • {event.category}
-                    </span>
-                  </div>
-
-                </div>
-
-                <div className="event-performance-stat">
-                  <span>Registrations</span>
-                  <strong>
-                    {event.registeredCount}
-                  </strong>
-                </div>
-
-                <div className="event-performance-stat participation-stat">
-                  <span>Participation</span>
-
-                  <strong>
-                    {participation}%
-                  </strong>
-                </div>
-
+              <div>
+                <span>Total Volunteers</span>
+                <strong>{totalVolunteers}</strong>
               </div>
-            );
-          })}
+            </div>
 
-        </div>
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <CalendarDays size={20} />
+              </div>
+              <div>
+                <span>Total Events</span>
+                <strong>{totalEvents}</strong>
+              </div>
+            </div>
 
-      </section>
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <span>Total Registrations</span>
+                <strong>{totalRegistrations}</strong>
+              </div>
+            </div>
 
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <span>Total Attendances</span>
+                <strong>{totalAttendance}</strong>
+              </div>
+            </div>
+
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <BarChart3 size={20} />
+              </div>
+              <div>
+                <span>Turnout Rate</span>
+                <strong>{averageParticipation}%</strong>
+              </div>
+            </div>
+
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <MessageSquareText size={20} />
+              </div>
+              <div>
+                <span>Student Feedback</span>
+                <strong>{totalFeedback}</strong>
+              </div>
+            </div>
+
+            <div className="analysis-stat-card">
+              <div className="analysis-stat-icon">
+                <Award size={20} />
+              </div>
+              <div>
+                <span>Certificates Issued</span>
+                <strong>{totalCertificates}</strong>
+              </div>
+            </div>
+          </section>
+
+          {/* EVENTS BREAKDOWN */}
+          <section className="analysis-panel" style={{ marginTop: "1.5rem", background: "#ffffff", padding: "1.5rem", borderRadius: "0.75rem", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.15rem", color: "#0f172a" }}>Event Performance Overview</h3>
+                <p style={{ margin: 0, color: "#64748b", fontSize: "0.875rem" }}>Live breakdown across all created events</p>
+              </div>
+              <BarChart3 size={20} style={{ color: "#7040d0" }} />
+            </div>
+
+            {events.length === 0 ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: "1.5rem" }}>No events found for analytics.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.875rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #e2e8f0", color: "#64748b", background: "#f8fafc" }}>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Event Name</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Category</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Capacity</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Registrations</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Attendees</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Turnout</th>
+                      <th style={{ padding: "0.75rem 0.5rem" }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((ev) => {
+                      const capacity = ev.participantsLimit || 100;
+                      const regs = ev.registeredCount || 0;
+                      const att = ev.attendedCount || 0;
+                      const turnoutPct = regs > 0 ? Math.round((att / regs) * 100) : 0;
+
+                      return (
+                        <tr key={ev._id || ev.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "0.75rem 0.5rem", fontWeight: 600, color: "#0f172a" }}>{ev.name}</td>
+                          <td style={{ padding: "0.75rem 0.5rem", color: "#7040d0", fontWeight: 500 }}>{ev.category || "General"}</td>
+                          <td style={{ padding: "0.75rem 0.5rem", color: "#64748b" }}>{capacity}</td>
+                          <td style={{ padding: "0.75rem 0.5rem", color: "#334155", fontWeight: 500 }}>{regs}</td>
+                          <td style={{ padding: "0.75rem 0.5rem", color: "#16a34a", fontWeight: 600 }}>{att}</td>
+                          <td style={{ padding: "0.75rem 0.5rem", color: "#d97706", fontWeight: 700 }}>{turnoutPct}%</td>
+                          <td style={{ padding: "0.75rem 0.5rem" }}>
+                            <span style={{
+                              padding: "2px 8px",
+                              borderRadius: "4px",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              textTransform: "capitalize",
+                              background: ev.status === "completed" ? "#dcfce7" : "#eff6ff",
+                              color: ev.status === "completed" ? "#15803d" : "#1d4ed8",
+                            }}>
+                              {ev.status || "published"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }

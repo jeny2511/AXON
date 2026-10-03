@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -16,53 +16,35 @@ import {
   Upload,
   Image,
 } from "lucide-react";
-import { events as mockEvents } from "../../mockData";
+import { eventService as apiEventService } from "../../services/eventService";
+import apiClient from "../../services/apiClient";
+import { getAssetUrl } from "../../utils/urlUtils";
 
-// ============================================================================
-// SERVICE LAYER (MVC ARCHITECTURE: FRONTEND SERVICE / API SIMULATOR)
-// In a full-stack MERN application, these functions will make real HTTP requests:
-// - getAll:   GET    /api/events
-// - create:   POST   /api/events
-// - update:   PUT    /api/events/:id
-// - delete:   DELETE /api/events/:id
-// Currently, it interacts with our shared mockData as our mock API.
-// ============================================================================
+// Helper eventService to communicate with live API
 const eventService = {
-  // Fetch all events from API/mockData
-  getAllEvents: () => {
-    return [...mockEvents];
+  getAllEvents: async () => {
+    const res = await apiEventService.getEvents();
+    return res.data || [];
   },
-
-  // Create a new event (supports 'upcoming' or 'draft' status)
-  createEvent: (newEventData, existingList, targetStatus = "upcoming") => {
-    const generatedId = `EV${String(existingList.length + 1).padStart(3, "0")}`;
-    return {
+  createEvent: async (newEventData, targetStatus = "upcoming") => {
+    const payload = {
       ...newEventData,
-      id: generatedId,
-      status: targetStatus,
-      registrationStatus: targetStatus === "draft" ? "closed" : "open",
-      registeredCount: 0,
-      certificateAvailable: false,
-      feedbackRequired: true,
+      status: targetStatus === "draft" ? "draft" : "published",
     };
+    const res = await apiEventService.createEvent(payload);
+    return res.data;
   },
-
-  // Update an existing event by ID
-  updateEvent: (eventId, updatedData, existingList) => {
-    return existingList.map((ev) =>
-      ev.id === eventId
-        ? {
-            ...ev,
-            ...updatedData,
-            participantLimit: Number(updatedData.participantLimit) || 100,
-          }
-        : ev
-    );
+  updateEvent: async (eventId, updatedData, targetStatus) => {
+    const payload = {
+      ...updatedData,
+      status: targetStatus ? (targetStatus === "draft" ? "draft" : "published") : updatedData.status,
+    };
+    const res = await apiEventService.updateEvent(eventId, payload);
+    return res.data;
   },
-
-  // Remove an event by ID
-  deleteEvent: (eventId, existingList) => {
-    return existingList.filter((ev) => ev.id !== eventId);
+  deleteEvent: async (eventId) => {
+    await apiEventService.deleteEvent(eventId);
+    return true;
   },
 };
 
@@ -129,8 +111,28 @@ function ManageEvents() {
   // STATE MANAGEMENT
   // ----------------------------------------------------
 
-  // Master events state loaded through our service layer (acting as API)
-  const [eventList, setEventList] = useState(() => eventService.getAllEvents());
+  // Master events state loaded through live API
+  const [eventList, setEventList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch events from API on mount
+  useEffect(() => {
+    let mounted = true;
+    eventService.getAllEvents()
+      .then((data) => {
+        if (mounted) setEventList(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load events in Volunteer ManageEvents:", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Active navigation tab: 'upcoming' | 'ongoing' | 'past' | 'drafts'
   const [activeTab, setActiveTab] = useState("upcoming");
@@ -297,25 +299,62 @@ function ManageEvents() {
   };
 
   // Handles file upload for event poster (images only)
-  const handlePosterUpload = (e) => {
+  const handlePosterUpload = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Stores filename or temporary object URL for preview
-      setFormData((prev) => ({
-        ...prev,
-        poster: file.name,
-      }));
+      try {
+        const uploadData = new FormData();
+        uploadData.append("file", file);
+        const res = await apiClient.post("/events/upload", uploadData);
+        const url = res.data?.url || res.data?.data?.url || res.url;
+        if (url) {
+          setFormData((prev) => ({
+            ...prev,
+            poster: url,
+          }));
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            poster: file.name,
+          }));
+        }
+      } catch (err) {
+        console.warn("Direct poster upload error:", err);
+        setFormData((prev) => ({
+          ...prev,
+          poster: file.name,
+        }));
+      }
     }
   };
 
   // Handles file upload for rulebook (PDF documents only)
-  const handleRulebookUpload = (e) => {
+  const handleRulebookUpload = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({
-        ...prev,
-        rulebook: file.name,
-      }));
+      try {
+        const uploadData = new FormData();
+        uploadData.append("file", file);
+        const res = await apiClient.post("/events/upload", uploadData);
+        const url = res.data?.url || res.data?.data?.url || res.url;
+        if (url) {
+          setFormData((prev) => ({
+            ...prev,
+            rulebook: url,
+          }));
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            rulebook: file.name,
+          }));
+        }
+      } catch (err) {
+        console.warn("Direct rulebook upload error:", err);
+        setFormData((prev) => ({
+          ...prev,
+          rulebook: file.name,
+        }));
+      }
     }
   };
 
@@ -384,7 +423,7 @@ function ManageEvents() {
   // - targetStatus = "draft": saves as draft (goes to Drafts tab)
   // - targetStatus = "upcoming": creates or moves draft to Upcoming tab
   // - targetStatus = null: regular edit (preserves existing status)
-  const handleSaveEvent = (e, targetStatus = null) => {
+  const handleSaveEvent = async (e, targetStatus = null) => {
     if (e) e.preventDefault();
     if (!formData.name.trim()) {
       setFormError("Event name is required.");
@@ -478,43 +517,38 @@ function ManageEvents() {
       eligibleDepartments: derivedDepts,
     };
 
-    if (editingEvent) {
-      // If moving draft to upcoming, set status to 'upcoming';
-      // Otherwise preserve existing status (e.g. keeping it in draft or upcoming)
-      const finalStatus = targetStatus ? targetStatus : editingEvent.status;
-      const updatedList = eventService.updateEvent(
-        editingEvent.id,
-        {
-          ...eventPayload,
-          status: finalStatus,
-          registrationStatus: finalStatus === "draft" ? "closed" : "open",
-        },
-        eventList
-      );
-      setEventList(updatedList);
+    try {
+      if (editingEvent) {
+        const finalStatus = targetStatus ? targetStatus : editingEvent.status;
+        const updated = await eventService.updateEvent(
+          editingEvent.id || editingEvent._id,
+          eventPayload,
+          finalStatus
+        );
+        setEventList((prev) =>
+          prev.map((ev) => ((ev.id === editingEvent.id || ev._id === editingEvent._id) ? updated : ev))
+        );
 
-      // If moved to upcoming, automatically switch active tab to "upcoming"
-      if (targetStatus === "upcoming") {
-        setActiveTab("upcoming");
+        if (targetStatus === "upcoming") {
+          setActiveTab("upcoming");
+        }
+      } else {
+        const finalStatus = targetStatus === "draft" ? "draft" : "upcoming";
+        const newEvent = await eventService.createEvent(
+          {
+            ...eventPayload,
+            participantLimit: Number(formData.participantLimit) || 100,
+          },
+          finalStatus
+        );
+        setEventList((prev) => [newEvent, ...prev]);
+        setActiveTab(finalStatus === "draft" ? "drafts" : "upcoming");
       }
-    } else {
-      // Creating new event: either as "draft" or as "upcoming"
-      const finalStatus = targetStatus === "draft" ? "draft" : "upcoming";
-      const newEvent = eventService.createEvent(
-        {
-          ...eventPayload,
-          participantLimit: Number(formData.participantLimit) || 100,
-        },
-        eventList,
-        finalStatus
-      );
-      setEventList([newEvent, ...eventList]);
 
-      // Automatically switch active tab to where the event was placed
-      setActiveTab(finalStatus === "draft" ? "drafts" : "upcoming");
+      setIsFormModalOpen(false);
+    } catch (err) {
+      setFormError(err.message || "Failed to save event.");
     }
-
-    setIsFormModalOpen(false);
   };
 
   // Opens delete confirmation modal
@@ -524,16 +558,16 @@ function ManageEvents() {
   };
 
   // Confirms deletion and deletes via Service Layer
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deletingEventId) {
-      // DELETE /api/events/:id -> Remove event in service layer
-      const remainingEvents = eventService.deleteEvent(
-        deletingEventId,
-        eventList
-      );
-      setEventList(remainingEvents);
-      setIsDeleteModalOpen(false);
-      setDeletingEventId(null);
+      try {
+        await eventService.deleteEvent(deletingEventId);
+        setEventList((prev) => prev.filter((ev) => ev.id !== deletingEventId && ev._id !== deletingEventId));
+        setIsDeleteModalOpen(false);
+        setDeletingEventId(null);
+      } catch (err) {
+        alert(err.message || "Failed to delete event.");
+      }
     }
   };
 
@@ -1547,13 +1581,35 @@ function ManageEvents() {
                 )}
               </div>
 
+              {/* Poster Preview */}
+              {viewingEvent.poster && (
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="font-semibold text-gray-800 mb-2">Event Poster</p>
+                  <img
+                    src={getAssetUrl(viewingEvent.poster)}
+                    alt={viewingEvent.name}
+                    className="w-full max-h-48 object-cover rounded-lg border border-gray-200"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Rulebook Document */}
               {viewingEvent.rulebook && (
                 <div className="flex items-center justify-between p-3 bg-gray-100 rounded-xl">
                   <span className="font-medium text-gray-700 flex items-center gap-2">
                     <FileText size={16} /> Rulebook: {viewingEvent.rulebook}
                   </span>
-                  <span className="text-[#7040d0] font-semibold">Attached</span>
+                  <a
+                    href={getAssetUrl(viewingEvent.rulebook)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#7040d0] hover:underline font-semibold"
+                  >
+                    View Document →
+                  </a>
                 </div>
               )}
             </div>

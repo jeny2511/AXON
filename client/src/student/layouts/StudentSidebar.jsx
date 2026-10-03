@@ -76,20 +76,20 @@ function StudentSidebar({ isOpen, onClose }) {
         </button>
       </div>
 
-      {/* Clickable Student / Guest Profile */}
+      {/* Clickable Student Profile */}
       <NavLink
-        to={authenticated ? "/profile" : "/login"}
+        to="/profile"
         className="sidebar-profile"
         onClick={handleLinkClick}
       >
         <div className="profile-avatar">{avatarInitial}</div>
 
         <div className="sidebar-profile-details">
-          <h4>{authenticated && student ? student.fullName : "Guest User"}</h4>
+          <h4>{student?.fullName || student?.name || "Student"}</h4>
           <p>
-            {authenticated && student
+            {student?.department
               ? `${student.department} Department`
-              : "Click to Sign In"}
+              : "Student Portal"}
           </p>
         </div>
       </NavLink>

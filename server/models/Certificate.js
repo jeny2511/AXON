@@ -22,6 +22,12 @@ const certificateSchema = new mongoose.Schema(
       required: [true, "Event reference is required"],
       index: true,
     },
+    registrationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Registration",
+      default: null,
+      index: true,
+    },
     studentName: {
       type: String,
       required: [true, "Student name is required"],
@@ -50,8 +56,8 @@ const certificateSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["generated", "available", "pending"],
-      default: "generated",
+      enum: ["generated", "available", "pending", "issued"],
+      default: "issued",
     },
     sentAutomatically: {
       type: Boolean,

@@ -1,33 +1,104 @@
+/* ==========================================================================
+   MY EVENTS (ATTENDED EVENTS HUB) — RESPONSIVE GRID & CARDS
+   ========================================================================== */
+
 .my-events-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
+@media (min-width: 1400px) {
+  .my-events-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .my-events-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
 }
 
 .my-event-wrapper {
   width: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  box-sizing: border-box;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Certificate + Feedback buttons */
+.my-event-wrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
 
+.my-event-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 6px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attendance-present {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.attendance-pending {
+  color: #d97706;
+  font-weight: 700;
+}
+
+/* Action buttons: natural wrapping, no fixed widths, no overflow */
 .my-event-extra-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .my-event-extra-actions button {
-  flex: 1;
-  padding: 11px 16px;
+  flex: 1 1 calc(50% - 8px);
+  min-width: 120px;
+  padding: 9px 12px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: 0.2s ease;
+  transition: all 0.2s ease;
+  text-align: center;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.qr-btn {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.qr-btn:hover {
+  background: #4338ca;
 }
 
 .certificate-btn {
@@ -35,7 +106,7 @@
   color: white;
 }
 
-.certificate-btn:hover {
+.certificate-btn:hover:not(:disabled) {
   background: #5b21b6;
   transform: translateY(-1px);
 }
@@ -45,7 +116,7 @@
   color: white;
 }
 
-.feedback-btn:hover {
+.feedback-btn:hover:not(:disabled) {
   background: #0d5f59;
   transform: translateY(-1px);
 }
@@ -195,39 +266,4 @@
 .feedback-success p {
   color: #666;
   margin-bottom: 22px;
-}
-
-/* Mobile */
-
-@media (max-width: 700px) {
-  .my-events-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .my-event-extra-actions {
-    flex-direction: column;
-  }
-
-  .feedback-modal {
-    padding: 22px;
-  }
-}
-
-.my-event-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-  font-size: 14px;
-}
-
-.attendance-present {
-  color: #16a34a;
-  font-weight: 700;
-}
-
-.attendance-pending {
-  color: #d97706;
-  font-weight: 700;
 }

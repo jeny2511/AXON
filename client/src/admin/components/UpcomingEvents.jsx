@@ -1,31 +1,30 @@
+import { useEffect, useState } from "react";
 import { CalendarDays, Clock, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-
-const events = [
-  {
-    name: "Web Development Workshop",
-    date: "15 Sep 2026",
-    time: "10:00 AM",
-    participants: 78,
-    status: "Upcoming",
-  },
-  {
-    name: "Cybersecurity Awareness Session",
-    date: "22 Sep 2026",
-    time: "02:00 PM",
-    participants: 64,
-    status: "Upcoming",
-  },
-  {
-    name: "Capture The Flag (CTF)",
-    date: "08 Oct 2026",
-    time: "09:00 AM",
-    participants: 52,
-    status: "Upcoming",
-  },
-];
+import { eventService } from "../../services/eventService";
 
 function UpcomingEvents() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    eventService.getEvents({ tab: "upcoming" })
+      .then((res) => {
+        if (mounted) setEvents((res.data || []).slice(0, 5));
+      })
+      .catch((err) => {
+        console.error("Failed to load upcoming events for admin dashboard:", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="panel upcoming-panel">
       <div className="panel-header">
@@ -41,36 +40,42 @@ function UpcomingEvents() {
       </div>
 
       <div className="event-list">
-        {events.map((event) => (
-          <div className="event-row" key={event.name}>
-            <div className="event-icon">
-              <CalendarDays size={18} />
-            </div>
-
-            <div className="event-info">
-              <strong>{event.name}</strong>
-
-              <div className="event-meta">
-                <span>
-                  <CalendarDays size={13} />
-                  {event.date}
-                </span>
-
-                <span>
-                  <Clock size={13} />
-                  {event.time}
-                </span>
+        {loading ? (
+          <div style={{ padding: "16px", color: "#888", textAlign: "center" }}>Loading...</div>
+        ) : events.length === 0 ? (
+          <div style={{ padding: "16px", color: "#888", textAlign: "center" }}>No upcoming events.</div>
+        ) : (
+          events.map((event) => (
+            <div className="event-row" key={event.id || event._id}>
+              <div className="event-icon">
+                <CalendarDays size={18} />
               </div>
-            </div>
 
-            <div className="event-participants">
-              <strong>{event.participants}</strong>
-              <span>Registered</span>
-            </div>
+              <div className="event-info">
+                <strong>{event.name}</strong>
 
-            <span className="status upcoming">{event.status}</span>
-          </div>
-        ))}
+                <div className="event-meta">
+                  <span>
+                    <CalendarDays size={13} />
+                    {event.eventDate}
+                  </span>
+
+                  <span>
+                    <Clock size={13} />
+                    {event.startTime}
+                  </span>
+                </div>
+              </div>
+
+              <div className="event-participants">
+                <strong>{event.registeredCount || 0}</strong>
+                <span>Registered</span>
+              </div>
+
+              <span className={`status ${event.status || "upcoming"}`}>{event.status || "Upcoming"}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

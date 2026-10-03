@@ -401,20 +401,46 @@ userSchema.statics.findByLoginIdentifier = function (identifier) {
  * Seeds the hardcoded AXON Admin account if it does not already exist in MongoDB.
  */
 userSchema.statics.seedDefaultAdmin = async function () {
-  const existingAdmin = await this.findOne({ role: "admin", isDeleted: false });
-  if (existingAdmin) {
-    return existingAdmin;
+  // Ensure primary admin admin@axon.edu / admin123
+  let adminEdu = await this.findOne({ email: "admin@axon.edu", isDeleted: false });
+  if (!adminEdu) {
+    adminEdu = await this.create({
+      role: "admin",
+      fullName: "TCF Executive Admin",
+      email: "admin@axon.edu",
+      password: "admin123",
+      enrollmentNumber: "ADM001",
+      department: "INFORMATION TECHNOLOGY",
+      phoneNumber: "9876543210",
+      batch: { startYear: 2022, endYear: 2026 },
+      semester: 8,
+      emailVerified: true,
+      accountStatus: "active",
+      profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+    });
+    console.log(`✅ [Database] Default Admin created: admin@axon.edu`);
   }
-  const admin = await this.create({
-    role: "admin",
-    fullName: "TCF Admin",
-    email: process.env.ADMIN_EMAIL || "admin@axon.demo",
-    password: process.env.ADMIN_PASSWORD || "Admin@123",
-    emailVerified: true,
-    accountStatus: "active",
-  });
-  console.log(`✅ [Database] Default Admin created: ${admin.email}`);
-  return admin;
+
+  // Ensure alias admin@axon.demo / Admin@123 for backward compatibility
+  let adminDemo = await this.findOne({ email: "admin@axon.demo", isDeleted: false });
+  if (!adminDemo) {
+    adminDemo = await this.create({
+      role: "admin",
+      fullName: "TCF Admin",
+      email: "admin@axon.demo",
+      password: "Admin@123",
+      enrollmentNumber: "ADM002",
+      department: "INFORMATION TECHNOLOGY",
+      phoneNumber: "9876543211",
+      batch: { startYear: 2022, endYear: 2026 },
+      semester: 8,
+      emailVerified: true,
+      accountStatus: "active",
+      profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300",
+    });
+  }
+
+  return adminEdu;
 };
 
 // Compound index for enrollment unique per role (active users)

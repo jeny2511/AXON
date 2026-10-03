@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
@@ -7,93 +7,78 @@ import {
   UserCheck,
 } from "lucide-react";
 
-import { attendance, events, users } from "../../mockData";
+import { volunteerService } from "../../services/volunteerService";
 
 function formatDate(dateStr) {
   if (!dateStr) return "N/A";
-  const dateObj = new Date(`${dateStr}T00:00:00`);
-  if (isNaN(dateObj)) return dateStr;
-  return dateObj.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  try {
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return dateStr;
+    return dateObj.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return String(dateStr);
+  }
 }
 
 function formatTime(timeStr) {
   if (!timeStr) return "";
-  const parts = timeStr.split(":");
-  if (parts.length < 2) return timeStr;
-  let hours = parseInt(parts[0], 10);
-  const minutes = parts[1];
-  const ampm = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const formattedHours = hours < 10 ? `0${hours}` : hours;
-  return `${formattedHours}:${minutes} ${ampm}`;
+  return timeStr;
 }
 
 function MyPresence() {
   const [search, setSearch] = useState("");
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Current logged in volunteer
-  const currentVolunteer = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("axon_volunteer_user");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const match = users.find(
-          (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
-        );
-        if (match) return match;
-      }
-    } catch (e) {}
+  useEffect(() => {
+    let isMounted = true;
 
-    return (
-      users.find((u) => u.id === "VL002") ||
-      users.find((u) => u.role === "volunteer") || {
-        id: "VL002",
-        fullName: "Dhruvi Patel",
+    async function loadAttendance() {
+      try {
+        setLoading(true);
+        const res = await volunteerService.getAttendance();
+        if (isMounted && res && res.data && Array.isArray(res.data)) {
+          const formatted = res.data.map((r) => ({
+            id: r._id || r.id,
+            name: r.eventName || r.eventId?.name || r.topic || "TCF Volunteer Session",
+            eventDate: r.date || r.eventId?.date || r.eventId?.eventDate,
+            startTime: r.time || r.eventId?.startTime || "10:00 AM",
+            endTime: r.eventId?.endTime || "",
+            activityType: r.activityType || "event",
+            status: r.attendanceStatus || "present",
+          }));
+          setRecords(formatted);
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to load volunteer attendance from API:", err.message);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    );
+
+      if (isMounted) {
+        setRecords([]);
+      }
+    }
+
+    loadAttendance();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Events where this volunteer's attendance has been marked present by Admin
-  const attendedEvents = useMemo(() => {
-    const volunteerId = currentVolunteer?.id || "VL002";
-
-    // Find all event IDs where volunteer's attendance is marked present
-    const markedEventIds = attendance
-      .filter(
-        (record) =>
-          (record.studentId === volunteerId ||
-            record.verifiedBy === volunteerId) &&
-          record.status === "present"
-      )
-      .map((record) => record.eventId);
-
-    // Fallback default events where volunteer attendance is registered/marked
-    const activeEventIds = [
-      ...new Set(
-        markedEventIds.length
-          ? markedEventIds
-          : volunteerId === "VL001"
-          ? ["EV001", "EV004", "EV011"]
-          : ["EV005", "EV013", "EV014"]
-      ),
-    ];
-
-    return events.filter((event) => activeEventIds.includes(event.id));
-  }, [currentVolunteer]);
-
-  // Filtered by search if user types in search bar
+  // Filtered by search
   const filteredEvents = useMemo(() => {
-    if (!search.trim()) return attendedEvents;
+    if (!search.trim()) return records;
     const query = search.trim().toLowerCase();
-    return attendedEvents.filter((ev) =>
+    return records.filter((ev) =>
       ev.name.toLowerCase().includes(query)
     );
-  }, [attendedEvents, search]);
+  }, [records, search]);
 
   return (
     <div className="space-y-6">
@@ -101,7 +86,7 @@ function MyPresence() {
       <div>
         <h1 className="text-2xl font-bold text-[#24154f]">My Presence</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Events where you joined as a volunteer and attendance was verified by Admin.
+          Events and meetings where you joined as a volunteer and attendance was verified by Admin.
         </p>
       </div>
 
@@ -114,7 +99,7 @@ function MyPresence() {
           <div>
             <p className="text-xs text-gray-500">Total Attended Events</p>
             <p className="text-lg font-bold text-[#24154f]">
-              {attendedEvents.length} Event{attendedEvents.length === 1 ? "" : "s"}
+              {records.length} Record{records.length === 1 ? "" : "s"}
             </p>
           </div>
         </div>
@@ -135,19 +120,25 @@ function MyPresence() {
         </div>
       </div>
 
-      {/* Table: Exactly 3 fields - Event Name, Date, Time */}
+      {/* Table */}
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[11px] font-semibold text-gray-600 uppercase tracking-wider">
-                <th className="py-3.5 px-6">Event Name</th>
+                <th className="py-3.5 px-6">Event / Activity Name</th>
                 <th className="py-3.5 px-6">Date</th>
                 <th className="py-3.5 px-6">Time</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs">
-              {filteredEvents.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={3} className="py-12 text-center text-gray-400">
+                    Loading volunteer attendance records from server...
+                  </td>
+                </tr>
+              ) : filteredEvents.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">

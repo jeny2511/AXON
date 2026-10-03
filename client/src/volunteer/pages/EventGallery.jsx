@@ -14,10 +14,13 @@ import {
   X,
 } from "lucide-react";
 
-import { gallery } from "../../mockData";
+import { galleryService } from "../../services/galleryService";
+import apiClient from "../../services/apiClient";
+import { getAssetUrl } from "../../utils/urlUtils";
 
 function EventGallery() {
-  const [galleries, setGalleries] = useState(gallery);
+  const [galleries, setGalleries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const [showCreate, setShowCreate] = useState(false);
@@ -35,6 +38,42 @@ function EventGallery() {
     speakerName: "",
     photos: [],
   });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadGallery() {
+      try {
+        setLoading(true);
+        const res = await galleryService.getGallery();
+        const data = res?.data || res || [];
+        if (isMounted && Array.isArray(data)) {
+          const formatted = data.map((item) => ({
+            galleryId: item._id || item.galleryId || item.id,
+            _id: item._id,
+            eventName: item.eventName || item.title,
+            venue: item.venue || "",
+            eventDate: item.date || item.eventDate,
+            description: item.description || "",
+            coverImage: item.banner || item.coverImage || (item.photos?.[0] || ""),
+            photos: item.photos || [],
+            speakerName: item.speakerName || "",
+            totalPhotos: item.photos?.length || 0,
+          }));
+          setGalleries(formatted);
+        }
+      } catch (err) {
+        console.warn("Failed to load gallery:", err.message);
+        if (isMounted) setGalleries([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadGallery();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredGalleries = useMemo(() => {
     if (!search.trim()) return galleries;
@@ -91,80 +130,139 @@ function EventGallery() {
     setEditMode(true);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.eventName.trim() || !form.description.trim() || !form.eventDate) {
       setToast("Please fill in event name, description, and date.");
       return;
     }
 
-    const newGallery = {
-      galleryId: `GAL${Date.now()}`,
-      eventName: form.eventName,
-      description: form.description,
-      eventDate: form.eventDate,
-      eventTime: form.eventTime || "14:00",
-      speakerName: form.speakerName || "TCF Team",
-      coverImage: form.photos[0] || "",
-      photos: form.photos,
-      videos: [],
-      totalPhotos: form.photos.length,
-    };
+    try {
+      const payload = {
+        eventName: form.eventName.trim(),
+        description: form.description.trim(),
+        date: form.eventDate,
+        speakerName: form.speakerName || "TCF Team",
+        banner: form.photos[0] || "",
+        photos: form.photos,
+        tags: [form.eventName.split(" ")[0] || "Event"],
+      };
 
-    setGalleries((current) => [newGallery, ...current]);
-    setShowCreate(false);
-    setForm({
-      eventName: "",
-      description: "",
-      eventDate: "",
-      eventTime: "",
-      speakerName: "",
-      photos: [],
-    });
-    setToast("Event gallery created successfully.");
+      const res = await galleryService.createGallery(payload);
+      const createdItem = res?.data || res;
+      const formatted = {
+        galleryId: createdItem._id || createdItem.id || `GAL${Date.now()}`,
+        _id: createdItem._id || createdItem.id,
+        eventName: createdItem.eventName || form.eventName,
+        description: createdItem.description || form.description,
+        eventDate: createdItem.date || form.eventDate,
+        eventTime: form.eventTime || "14:00",
+        speakerName: form.speakerName || "TCF Team",
+        coverImage: form.photos[0] || "",
+        photos: form.photos,
+        videos: [],
+        totalPhotos: form.photos.length,
+      };
+
+      setGalleries((current) => [formatted, ...current]);
+      setShowCreate(false);
+      setForm({
+        eventName: "",
+        description: "",
+        eventDate: "",
+        eventTime: "",
+        speakerName: "",
+        photos: [],
+      });
+      setToast("Event gallery created successfully.");
+    } catch (err) {
+      setToast(err.message || "Failed to create gallery in database.");
+    }
   }
 
-  function handleUpdate() {
+  async function handleUpdate() {
     if (!form.eventName.trim() || !form.description.trim()) {
       setToast("Event name and description cannot be empty.");
       return;
     }
 
-    const updated = {
-      ...selectedGallery,
-      eventName: form.eventName,
-      description: form.description,
-      eventDate: form.eventDate,
-      eventTime: form.eventTime,
-      speakerName: form.speakerName,
-      photos: form.photos,
-      coverImage: form.photos[0] || selectedGallery.coverImage || "",
-      totalPhotos: form.photos.length,
-    };
+    const galleryId = selectedGallery._id || selectedGallery.galleryId || selectedGallery.id;
 
-    setGalleries((current) =>
-      current.map((item) => (item.galleryId === updated.galleryId ? updated : item))
-    );
+    try {
+      const payload = {
+        eventName: form.eventName.trim(),
+        description: form.description.trim(),
+        date: form.eventDate,
+        speakerName: form.speakerName,
+        photos: form.photos,
+        banner: form.photos[0] || selectedGallery.coverImage || "",
+      };
 
-    setSelectedGallery(updated);
-    setEditMode(false);
-    setPhotoIndex(0);
-    setToast("Gallery updated successfully.");
+      await galleryService.updateGallery(galleryId, payload);
+
+      const updated = {
+        ...selectedGallery,
+        eventName: form.eventName,
+        description: form.description,
+        eventDate: form.eventDate,
+        eventTime: form.eventTime,
+        speakerName: form.speakerName,
+        photos: form.photos,
+        coverImage: form.photos[0] || selectedGallery.coverImage || "",
+        totalPhotos: form.photos.length,
+      };
+
+      setGalleries((current) =>
+        current.map((item) =>
+          (item.galleryId === updated.galleryId || item._id === updated._id) ? updated : item
+        )
+      );
+
+      setSelectedGallery(updated);
+      setEditMode(false);
+      setPhotoIndex(0);
+      setToast("Gallery updated successfully.");
+    } catch (err) {
+      setToast(err.message || "Failed to update gallery in database.");
+    }
   }
 
-  function handleDelete(galleryId) {
-    setGalleries((current) => current.filter((item) => item.galleryId !== galleryId));
-    setSelectedGallery(null);
-    setToast("Gallery entry removed.");
+  async function handleDelete(galleryId) {
+    try {
+      await galleryService.deleteGallery(galleryId);
+      setGalleries((current) =>
+        current.filter((item) => item.galleryId !== galleryId && item._id !== galleryId)
+      );
+      setSelectedGallery(null);
+      setToast("Gallery entry removed.");
+    } catch (err) {
+      setToast(err.message || "Failed to delete gallery from database.");
+    }
   }
 
-  function handlePhotoUpload(e) {
+  async function handlePhotoUpload(e) {
     const files = Array.from(e.target.files || []);
-    const imageUrls = files.map((file) => URL.createObjectURL(file));
+    if (files.length === 0) return;
 
-    setForm((current) => ({
-      ...current,
-      photos: [...current.photos, ...imageUrls].slice(0, 6),
-    }));
+    try {
+      const uploadedUrls = [];
+      for (const file of files) {
+        const uploadData = new FormData();
+        uploadData.append("file", file);
+        const res = await apiClient.post("/gallery/upload", uploadData);
+        const url = res.data?.url || res.data?.data?.url || res.url;
+        if (url) {
+          uploadedUrls.push(url);
+        }
+      }
+
+      setForm((current) => ({
+        ...current,
+        photos: [...current.photos, ...uploadedUrls].slice(0, 6),
+      }));
+    } catch (err) {
+      console.warn("Direct upload error:", err);
+      setToast(err.message || "Failed to upload photo file.");
+    }
   }
 
   return (
@@ -228,12 +326,12 @@ function EventGallery() {
               <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-purple-900 to-indigo-950">
                 {item.coverImage ? (
                   <img
-                    src={item.coverImage}
+                    src={getAssetUrl(item.coverImage)}
                     alt={item.eventName}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     onError={(e) => {
                       e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
+                      if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
                     }}
                   />
                 ) : null}
@@ -349,11 +447,11 @@ function EventGallery() {
               <div className="relative flex h-[380px] w-full items-center justify-center overflow-hidden rounded-xl bg-gray-950">
                 {selectedGallery.photos?.length ? (
                   <img
-                    src={selectedGallery.photos[photoIndex]}
+                    src={getAssetUrl(selectedGallery.photos[photoIndex])}
                     alt={selectedGallery.eventName}
                     className="h-full w-full object-contain"
                     onError={(e) => {
-                      e.target.src = selectedGallery.coverImage || "";
+                      e.target.style.display = "none";
                     }}
                   />
                 ) : (
@@ -409,7 +507,7 @@ function EventGallery() {
                         photoIndex === idx ? "border-purple-600 scale-105" : "border-transparent opacity-60"
                       }`}
                     >
-                      <img src={photo} alt="" className="h-full w-full object-cover" />
+                      <img src={getAssetUrl(photo)} alt="" className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -581,7 +679,7 @@ function GalleryFormModal({ title, form, setForm, onClose, onSave, onPhotoUpload
               <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {form.photos.map((photo, index) => (
                   <div key={index} className="group relative h-20 w-full overflow-hidden rounded-lg border">
-                    <img src={photo} alt="" className="h-full w-full object-cover" />
+                    <img src={getAssetUrl(photo)} alt="" className="h-full w-full object-cover" />
                     <button
                       type="button"
                       onClick={() =>

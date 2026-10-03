@@ -113,17 +113,17 @@ function StudentNavbar({ onToggleSidebar }) {
               flexShrink: 0,
             }}
           >
-            {authenticated && student?.fullName
+            {student?.fullName
               ? student.fullName.charAt(0)
-              : "G"}
+              : "S"}
           </div>
 
           <div>
-            <h4>{authenticated && student ? student.fullName : "Guest User"}</h4>
+            <h4>{student?.fullName || student?.name || "Student"}</h4>
             <p>
-              {authenticated && student
+              {student?.department
                 ? `${student.department} Department`
-                : "Sign In"}
+                : "Student Portal"}
             </p>
           </div>
         </Link>

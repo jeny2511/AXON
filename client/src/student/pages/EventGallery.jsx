@@ -1,23 +1,69 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./pages.css";
 import "./EventGallery.css";
 import StudentLayout from "../layouts/StudentLayout";
 import EmptyState from "../components/EmptyState/EmptyState";
 import SearchBar from "../components/SearchBar/SearchBar";
-import { getGallery } from "../services/studentService";
+import { fetchGalleryApi, getGallery } from "../services/studentService";
+import { getAssetUrl } from "../../utils/urlUtils";
 
 function EventGallery() {
-  const galleryItems = getGallery();
+  const [galleryItems, setGalleryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTag, setSelectedTag] = useState("All");
   const [activePhoto, setActivePhoto] = useState(null);
 
+  useEffect(() => {
+    let isMounted = true;
+    async function loadGallery() {
+      try {
+        setLoading(true);
+        const data = await fetchGalleryApi();
+        if (isMounted && data && Array.isArray(data)) {
+          const formatted = data.map((item) => ({
+            galleryId: item._id || item.galleryId,
+            _id: item._id,
+            eventName: item.eventName,
+            venue: item.venue || "",
+            eventDate: item.date
+              ? new Date(item.date).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+              : item.eventDate || "Date N/A",
+            description: item.description || "",
+            coverImage: item.banner || item.coverImage || (item.photos?.[0] || ""),
+            photos: item.photos || [],
+            videos: item.videos || [],
+            tags: item.tags || [],
+            totalPhotos: item.photos?.length || 0,
+          }));
+          setGalleryItems(formatted);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to load gallery from API:", err.message);
+      }
+
+      if (isMounted) {
+        setGalleryItems([]);
+        setLoading(false);
+      }
+    }
+
+    loadGallery();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Extract all unique tags
   const allTags = [
     "All",
-    ...new Set(
-      galleryItems.flatMap((item) => item.tags || [])
-    ),
+    ...new Set(galleryItems.flatMap((item) => item.tags || [])),
   ];
 
   const filteredGallery = galleryItems.filter((item) => {
@@ -80,28 +126,51 @@ function EventGallery() {
         )}
 
         <div className="event-gallery-section">
-          {filteredGallery.length > 0 ? (
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b" }}>
+              Loading event memories & gallery highlights...
+            </div>
+          ) : filteredGallery.length > 0 ? (
             <div className="gallery-grid">
               {filteredGallery.map((item) => (
-                <div className="gallery-card" key={item.galleryId}>
+                <div className="gallery-card" key={item.galleryId || item._id}>
                   <div className="gallery-photo-grid">
-                    {item.photos &&
-                      item.photos.slice(0, 4).map((photo, index) => (
-                        <div
-                          className="gallery-photo-item"
-                          key={index}
-                          onClick={() => setActivePhoto({ photo, name: `${item.eventName} (Photo ${index + 1})` })}
-                          style={{ cursor: "pointer" }}
-                        >
-                          <img
-                            src={photo}
-                            alt={`${item.eventName} ${index + 1}`}
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                            }}
-                          />
-                        </div>
-                      ))}
+                    {item.photos && item.photos.length > 0 ? (
+                      item.photos.slice(0, 4).map((photo, index) => {
+                        const resolvedUrl = getAssetUrl(photo);
+                        return (
+                          <div
+                            className="gallery-photo-item"
+                            key={index}
+                            onClick={() => setActivePhoto({ photo: resolvedUrl, name: `${item.eventName} (Photo ${index + 1})` })}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <img
+                              src={resolvedUrl}
+                              alt={`${item.eventName} ${index + 1}`}
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div
+                        style={{
+                          height: "140px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "#f8fafc",
+                          color: "#94a3b8",
+                          fontSize: "13px",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        📸 Photo gallery collection
+                      </div>
+                    )}
                   </div>
 
                   <div className="gallery-card-content">
@@ -193,7 +262,7 @@ function EventGallery() {
                   borderRadius: "8px",
                 }}
                 onError={(e) => {
-                  e.target.src = "/assets/images/gallery/sih/cover.jpg";
+                  e.target.style.display = "none";
                 }}
               />
             </div>

@@ -31,12 +31,10 @@ import {
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react";
-import {
-  events as mockEvents,
-  users as mockUsers,
-  registrations as mockRegistrations,
-  attendance as mockAttendance,
-} from "../../mockData";
+import { eventService } from "../../services/eventService";
+import { registrationService as apiRegistrationService } from "../../services/registrationService";
+import { attendanceService } from "../../services/attendanceService";
+import jsQR from "jsqr";
 
 // ============================================================================
 // SERVICE LAYER (MVC ARCHITECTURE: FRONTEND SERVICE / API SIMULATOR)
@@ -166,166 +164,6 @@ function parseQRCodeData(rawText) {
   };
 }
 
-/**
- * Realistic student participant pool based on VGEC enrollment structures
- * (combines mockData users and sample students shown in reference designs)
- */
-const SAMPLE_STUDENT_POOL = [
-  { enrollmentNo: "24IT001", name: "Priyansh Patel", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT002", name: "Jinal Shah", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE015", name: "Meet Desai", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC007", name: "Krisha Vora", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT010", name: "Dhruv Mehta", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107054", name: "Jeny Thesiya", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107055", name: "Archi Patel", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107056", name: "Riya Shah", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107057", name: "Meet Parmar", department: "ICT", year: "4th Year", semester: 7 },
-  { enrollmentNo: "220130107058", name: "Krishna Dave", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107059", name: "Harsh Joshi", department: "CE", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "24IT018", name: "Tanvi Panchal", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE032", name: "Smit Solanki", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC021", name: "Aayush Trivedi", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24ICT009", name: "Nirav Barot", department: "ICT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT025", name: "Khushi Prajapati", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE044", name: "Yash Makwana", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC035", name: "Diya Rathod", department: "EC", year: "2nd Year", semester: 3 },
-];
-
-/**
- * Event-specific student registration mappings:
- * Each event has its OWN specific registered students based on registrations in AXON.
- * Only students registered for that specific event are shown in that event's sheet!
- */
-const EVENT_REGISTERED_STUDENTS_MAP = {
-  EV001: [
-    "220130107054", // Jeny Thesiya (REG001)
-    "220130107055", // Archi Patel (REG006)
-    "24IT001",      // Priyansh Patel
-    "24IT002",      // Jinal Shah
-    "24CE015",      // Meet Desai
-    "24EC007",      // Krisha Vora
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-  ],
-  EV002: [
-    "220130107054", // Jeny Thesiya (REG002)
-    "220130107059", // Harsh Joshi (REG014)
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-    "24CE032",      // Smit Solanki
-    "24ICT009",     // Nirav Barot
-    "24IT025",      // Khushi Prajapati
-  ],
-  EV003: [
-    "220130107054", // Jeny Thesiya (REG003)
-    "220130107055", // Archi Patel (REG007)
-    "220130107056", // Riya Shah
-    "24CE015",      // Meet Desai
-    "24EC021",      // Aayush Trivedi
-    "24CE044",      // Yash Makwana
-  ],
-  EV004: [
-    "220130107054", // Jeny Thesiya (REG004)
-    "220130107057", // Meet Parmar (REG010)
-    "24IT001",      // Priyansh Patel
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-  EV005: [
-    "220130107054", // Jeny Thesiya (REG005)
-    "220130107056", // Riya Shah (REG009)
-    "24IT002",      // Jinal Shah
-    "24EC007",      // Krisha Vora
-    "24IT025",      // Khushi Prajapati
-    "24CE044",      // Yash Makwana
-  ],
-  EV006: [
-    "220130107057", // Meet Parmar (REG011)
-    "24CE015",      // Meet Desai
-    "24IT018",      // Tanvi Panchal
-    "24ICT009",     // Nirav Barot
-  ],
-  EV007: [
-    "220130107058", // Krishna Dave (REG012)
-    "24IT001",      // Priyansh Patel
-    "24IT010",      // Dhruv Mehta
-    "24EC021",      // Aayush Trivedi
-  ],
-  EV008: [
-    "220130107058", // Krishna Dave (REG013)
-    "24IT002",      // Jinal Shah
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-};
-
-/**
- * Service to simulate backend database operations
- */
-const registrationService = {
-  // Returns all events sorted to prioritize upcoming / ongoing events
-  getAllEvents: () => {
-    return [...mockEvents].sort((a, b) => {
-      // Prioritize upcoming or ongoing events first
-      const statusOrder = { ongoing: 0, upcoming: 1, draft: 2, past: 3, completed: 3 };
-      const rankA = statusOrder[a.status] ?? 4;
-      const rankB = statusOrder[b.status] ?? 4;
-      if (rankA !== rankB) return rankA - rankB;
-      return new Date(a.eventDate) - new Date(b.eventDate);
-    });
-  },
-
-  // Generates or fetches participant roster specifically registered for this event
-  getParticipantsForEvent: (event) => {
-    if (!event) return [];
-
-    // 1. Get the list of enrollment numbers registered specifically for this event
-    let registeredEnrollments = EVENT_REGISTERED_STUDENTS_MAP[event.id];
-
-    if (!registeredEnrollments) {
-      // For any newly created or custom events, filter students matching the event's eligibility
-      registeredEnrollments = SAMPLE_STUDENT_POOL
-        .filter((student) => {
-          const deptMatch =
-            !event.eligibleDepartments ||
-            event.eligibleDepartments.length === 0 ||
-            event.eligibleDepartments.includes(student.department);
-          const yearNum = typeof student.year === "string" ? parseInt(student.year[0]) : student.year;
-          const yearMatch =
-            !event.eligibleYears ||
-            event.eligibleYears.length === 0 ||
-            event.eligibleYears.includes(yearNum);
-          return deptMatch && yearMatch;
-        })
-        .slice(0, event.participantLimit || 8)
-        .map((s) => s.enrollmentNo);
-    }
-
-    // 2. Map ONLY those students registered for this specific event
-    return SAMPLE_STUDENT_POOL
-      .filter((student) => registeredEnrollments.includes(student.enrollmentNo))
-      .map((student, index) => {
-        // Attendance status: First 2-3 are checked in (Present) by default, others Absent
-        const isPresent = index < 3;
-        const randomMinute = 10 + (index * 3);
-        const formattedMin = randomMinute < 10 ? `0${randomMinute}` : randomMinute;
-
-        return {
-          id: `REG-${event.id}-${student.enrollmentNo}`,
-          eventId: event.id,
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
-          department: student.department,
-          year: student.year,
-          semester: student.semester || 3,
-          status: isPresent ? "present" : "absent",
-          checkInTime: isPresent ? `10:${formattedMin} AM` : null,
-          qrCode: `QR-${event.id}-${student.enrollmentNo}`,
-        };
-      });
-  },
-};
-
 // ============================================================================
 // MAIN COMPONENT: Registrations
 // ============================================================================
@@ -335,10 +173,33 @@ export default function Registrations() {
   // ----------------------------------------------------
 
   // Master list of all available events (upcoming, ongoing, past)
-  const [eventsList] = useState(() => registrationService.getAllEvents());
+  const [eventsList, setEventsList] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    eventService.getEvents().then((res) => {
+      if (isMounted) {
+        const events = res?.data || [];
+        setEventsList(events);
+        setLoadingEvents(false);
+      }
+    }).catch((err) => {
+      console.warn("Failed to load events for registrations:", err);
+      if (isMounted) {
+        setEventsList([]);
+        setLoadingEvents(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Nearest event (first upcoming/ongoing event) selected by default
   const nearestEvent = useMemo(() => {
+    if (!eventsList || eventsList.length === 0) return null;
     return (
       eventsList.find((ev) => ev.status === "upcoming" || ev.status === "ongoing") ||
       eventsList[0] ||
@@ -347,28 +208,28 @@ export default function Registrations() {
   }, [eventsList]);
 
   // Currently selected active event ID
-  const [selectedEventId, setSelectedEventId] = useState(
-    () => nearestEvent?.id || ""
-  );
+  const [selectedEventId, setSelectedEventId] = useState("");
+
+  useEffect(() => {
+    if (!selectedEventId && nearestEvent) {
+      setSelectedEventId(nearestEvent._id || nearestEvent.id || "");
+    }
+  }, [nearestEvent, selectedEventId]);
 
   // Active event object
   const selectedEvent = useMemo(() => {
-    return eventsList.find((ev) => ev.id === selectedEventId) || nearestEvent;
+    if (!eventsList || eventsList.length === 0) return null;
+    return eventsList.find((ev) => (ev._id || ev.id) === selectedEventId) || nearestEvent;
   }, [eventsList, selectedEventId, nearestEvent]);
 
-  // Attendance Window is determined by event configurations set in Manage Events:
-  // - If event is ongoing, attendance is active
-  // - Or if current time falls within [attendanceOpen, attendanceClose]
-  // - Or if attendanceStatus is explicitly marked open
+  // Attendance Window is determined by event configurations set in Manage Events
   const isAttendanceOpen = useMemo(() => {
     if (!selectedEvent) return false;
 
-    // Ongoing events have attendance open
     if (selectedEvent.status === "ongoing") {
       return true;
     }
 
-    // Time-based check matching configured window from Manage Events
     if (selectedEvent.attendanceOpen && selectedEvent.attendanceClose) {
       const now = new Date();
       const openTime = new Date(selectedEvent.attendanceOpen);
@@ -378,8 +239,7 @@ export default function Registrations() {
       }
     }
 
-    // Explicit status or mock event default
-    if (selectedEvent.attendanceStatus === "open" || selectedEvent.id === "EV002") {
+    if (selectedEvent.attendanceStatus === "open") {
       return true;
     }
 
@@ -392,40 +252,54 @@ export default function Registrations() {
 
   // Student participant roster state for the active event
   const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
 
   // Load participants whenever active event changes
   useEffect(() => {
+    let isMounted = true;
     if (selectedEvent) {
-      const storageKey = `axon_participants_${selectedEvent.id}`;
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        try {
-          setParticipants(JSON.parse(stored));
-          return;
-        } catch (e) {
-          console.error("Error parsing stored participants:", e);
-        }
-      }
-      const initialRoster = registrationService.getParticipantsForEvent(selectedEvent);
-      setParticipants(initialRoster);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(initialRoster));
-      } catch (e) {
-        console.error("Error writing initial participants to localStorage:", e);
-      }
-    }
-  }, [selectedEvent]);
+      const eventId = selectedEvent._id || selectedEvent.id;
+      setLoadingParticipants(true);
 
-  // Keep localStorage synchronized whenever participants change locally
-  useEffect(() => {
-    if (selectedEvent && participants.length > 0) {
-      try {
-        localStorage.setItem(`axon_participants_${selectedEvent.id}`, JSON.stringify(participants));
-      } catch (e) {
-        console.error("Error saving participants to localStorage:", e);
-      }
+      apiRegistrationService.getEventRegistrations(eventId).then((res) => {
+        if (!isMounted) return;
+        if (res?.data && Array.isArray(res.data)) {
+          const mapped = res.data.map((reg) => {
+            const student = reg.studentId || {};
+            const isPresent = reg.status === "attended";
+            return {
+              id: reg._id,
+              registrationId: reg._id,
+              eventId: eventId,
+              enrollmentNo: student.enrollmentNo || "N/A",
+              name: student.fullName || student.name || "Student",
+              department: student.department || "IT",
+              year: student.year ? `${student.year} Year` : "2nd Year",
+              semester: student.semester || 3,
+              status: isPresent ? "present" : "absent",
+              checkInTime: reg.checkedInAt ? new Date(reg.checkedInAt).toLocaleTimeString() : null,
+              qrCode: reg.qrCode || `QR-${eventId}-${student.enrollmentNo}`,
+            };
+          });
+          setParticipants(mapped);
+        } else {
+          setParticipants([]);
+        }
+      }).catch((err) => {
+        console.warn("Failed to load event participants:", err.message);
+        if (isMounted) setParticipants([]);
+      }).finally(() => {
+        if (isMounted) setLoadingParticipants(false);
+      });
+    } else {
+      setParticipants([]);
+      setLoadingParticipants(false);
     }
-  }, [selectedEvent, participants]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEvent]);
 
   // Two-way synchronization: Listen for storage events when attendance changes in the new tab sheet
   useEffect(() => {
@@ -481,10 +355,10 @@ export default function Registrations() {
   // Filtered events for the event search bar across upcoming, ongoing, and past
   const matchingEvents = useMemo(() => {
     const q = eventSearchQuery.trim().toLowerCase();
-    if (!q) return eventsList;
-    return eventsList.filter((ev) => {
-      const name = ev.name.toLowerCase();
-      const cat = ev.category.toLowerCase();
+    if (!q) return eventsList || [];
+    return (eventsList || []).filter((ev) => {
+      const name = (ev.name || ev.title || "").toLowerCase();
+      const cat = (ev.category || "").toLowerCase();
       const venue = (ev.venue || "").toLowerCase();
       const status = (ev.status || "").toLowerCase();
       const isPast = status === "completed" || status === "past";
@@ -522,12 +396,22 @@ export default function Registrations() {
   // ----------------------------------------------------
 
   // Toggle single student's status between Present and Absent
-  const handleToggleAttendance = (enrollmentNo) => {
+  const handleToggleAttendance = async (enrollmentNo) => {
     if (!isAttendanceOpen) {
       alert(
         `Attendance Window for "${selectedEvent?.name}" is not open yet. Attendance can only be taken when the window is open.`
       );
       return;
+    }
+
+    const eventId = selectedEvent?._id || selectedEvent?.id;
+    try {
+      await attendanceService.markManual({
+        enrollmentNo,
+        eventId,
+      });
+    } catch (e) {
+      console.warn("Manual attendance API notice:", e.message);
     }
 
     setParticipants((prev) =>
@@ -617,87 +501,12 @@ export default function Registrations() {
     }
   };
 
-  // Comprehensive QR Code Validator: Extracts student details & validates
-  const handleValidateQR = (rawQRString) => {
+  // Comprehensive QR Code Validator: Sends decoded token to backend /api/attendance/scan
+  const handleValidateQR = async (rawQRString) => {
     if (!selectedEvent || !rawQRString) return false;
 
-    const parsed = parseQRCodeData(rawQRString);
-    if (!parsed || !parsed.enrollmentNo) {
-      playBeep("error");
-      setScanResult({
-        status: "invalid_qr",
-        title: "Unrecognized QR Code",
-        message: "The scanned QR code is malformed or does not contain student credentials.",
-        raw: rawQRString,
-        timestamp: new Date().toLocaleTimeString("en-IN"),
-      });
-      return false;
-    }
-
-    const enrollment = parsed.enrollmentNo.trim().toUpperCase();
-
-    // 1. Validation Rule: Is Attendance Window Open?
-    if (!isAttendanceOpen) {
-      playBeep("error");
-      setScanResult({
-        status: "window_closed",
-        title: "Attendance Window Closed",
-        message: `Attendance is not open for "${selectedEvent.name}". Please check attendance schedule in Manage Events.`,
-        enrollmentNo: enrollment,
-        raw: rawQRString,
-        timestamp: new Date().toLocaleTimeString("en-IN"),
-      });
-      return false;
-    }
-
-    // 2. Validation Rule: Event ID Check (Prevent wrong event passes)
-    if (parsed.eventId && parsed.eventId.toUpperCase() !== selectedEvent.id.toUpperCase()) {
-      playBeep("error");
-      setScanResult({
-        status: "event_mismatch",
-        title: "Event Mismatch Pass",
-        message: `This ticket was issued for Event "${parsed.eventId}", but you are currently scanning for "${selectedEvent.name}" (${selectedEvent.id}).`,
-        enrollmentNo: enrollment,
-        expectedEvent: selectedEvent.name,
-        ticketEvent: parsed.eventId,
-        raw: rawQRString,
-        timestamp: new Date().toLocaleTimeString("en-IN"),
-      });
-      return false;
-    }
-
-    // 3. Validation Rule: Student Registration Check
-    const student = participants.find(
-      (p) => p.enrollmentNo.trim().toUpperCase() === enrollment
-    );
-
-    if (!student) {
-      playBeep("error");
-      setScanResult({
-        status: "not_registered",
-        title: "Student Not Registered",
-        message: `Enrollment number "${enrollment}" is not found in the official registrations list for "${selectedEvent.name}".`,
-        enrollmentNo: enrollment,
-        raw: rawQRString,
-        timestamp: new Date().toLocaleTimeString("en-IN"),
-      });
-      return false;
-    }
-
-    // 4. Validation Rule: Duplicate Attendance Check
-    if (student.status === "present") {
-      playBeep("warning");
-      setScanResult({
-        status: "already_present",
-        title: "Already Checked In",
-        message: `${student.name} was already marked Present at ${student.checkInTime || "earlier today"}. Duplicate scan detected.`,
-        student,
-        timestamp: new Date().toLocaleTimeString("en-IN"),
-      });
-      return true;
-    }
-
-    // 5. Successful Attendance Check-in & Validation
+    const trimmedToken = rawQRString.trim();
+    const eventId = selectedEvent._id || selectedEvent.id;
     const now = new Date();
     const timeString = now.toLocaleTimeString("en-IN", {
       hour: "2-digit",
@@ -705,43 +514,134 @@ export default function Registrations() {
       hour12: true,
     });
 
-    const updatedStudent = {
-      ...student,
-      status: "present",
-      checkInTime: timeString,
-    };
+    console.log(`[QR DEBUG] Raw decoded value: ${trimmedToken}`);
+    console.log(`[QR DEBUG] Decoded value length: ${trimmedToken.length}`);
+    console.log(`[QR DEBUG] Selected event ID: ${eventId}`);
+    console.log(`[QR DEBUG] Sending attendance request...`);
 
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.enrollmentNo.trim().toUpperCase() === enrollment
-          ? updatedStudent
-          : p
-      )
-    );
+    try {
+      // 1. Call real backend attendance scan API
+      const res = await attendanceService.scanQR(trimmedToken, eventId);
 
-    playBeep("success");
+      const studentData = res?.data?.student || {};
+      const enrollment = (studentData.enrollmentNo || studentData.enrollmentNumber || "").trim().toUpperCase();
 
-    setScanResult({
-      status: "success",
-      title: "Attendance Verified & Recorded!",
-      message: `${student.name} has been verified and checked into ${selectedEvent.name}.`,
-      student: updatedStudent,
-      timestamp: timeString,
-    });
+      // Update participant in local roster
+      setParticipants((prev) =>
+        prev.map((p) => {
+          if (
+            (enrollment && p.enrollmentNo?.trim().toUpperCase() === enrollment) ||
+            (studentData.id && (p.id === studentData.id || p.studentId === studentData.id))
+          ) {
+            return {
+              ...p,
+              status: "present",
+              checkInTime: timeString,
+            };
+          }
+          return p;
+        })
+      );
 
-    setRecentScans((prev) => [
-      {
-        id: Date.now(),
+      playBeep("success");
+
+      setScanResult({
         status: "success",
-        studentName: student.name,
-        enrollmentNo: student.enrollmentNo,
-        department: student.department,
-        time: timeString,
-      },
-      ...prev.slice(0, 9),
-    ]);
+        title: "Attendance Verified & Recorded!",
+        message: res.message || `Attendance marked successfully for ${studentData.name || "Student"}.`,
+        student: {
+          name: studentData.name || "Student",
+          enrollmentNo: studentData.enrollmentNo || enrollment || "Verified",
+          department: studentData.department || "Attendee",
+        },
+        timestamp: timeString,
+      });
 
-    return true;
+      setRecentScans((prev) => [
+        {
+          id: Date.now(),
+          status: "success",
+          studentName: studentData.name || "Student",
+          enrollmentNo: studentData.enrollmentNo || enrollment || "Verified",
+          department: studentData.department || "Attendee",
+          time: timeString,
+        },
+        ...prev.slice(0, 9),
+      ]);
+
+      return true;
+    } catch (err) {
+      const errRes = err.response?.data || {};
+
+      // 2. Fallback: If raw input was a manual enrollment string and scanQR returned 404 (token not found), attempt manual checkin
+      if (err.response?.status === 404) {
+        try {
+          const manualRes = await attendanceService.markManual({
+            enrollmentNo: trimmedToken,
+            eventId,
+          });
+
+          const studentData = manualRes?.data?.student || {};
+          const enrollment = (studentData.enrollmentNo || trimmedToken).toUpperCase();
+
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.enrollmentNo?.trim().toUpperCase() === enrollment
+                ? { ...p, status: "present", checkInTime: timeString }
+                : p
+            )
+          );
+
+          playBeep("success");
+
+          setScanResult({
+            status: "success",
+            title: "Manual Check-in Recorded!",
+            message: manualRes.message || `Attendance marked for ${studentData.name || enrollment}.`,
+            student: {
+              name: studentData.name || "Student",
+              enrollmentNo: enrollment,
+              department: studentData.department || "Attendee",
+            },
+            timestamp: timeString,
+          });
+          return true;
+        } catch (mErr) {
+          // Fall through to error handling
+        }
+      }
+
+      // 3. Handle duplicate attendance scan
+      if (errRes.duplicate) {
+        playBeep("warning");
+        const studentInfo = errRes.data?.student || {};
+        setScanResult({
+          status: "already_present",
+          title: "Already Checked In",
+          message: errRes.message || "Student is already marked Present.",
+          student: studentInfo.name
+            ? {
+                name: studentInfo.name,
+                enrollmentNo: studentInfo.enrollmentNo,
+                department: studentInfo.department,
+              }
+            : null,
+          timestamp: timeString,
+        });
+        return false;
+      }
+
+      // 4. Handle other validation rejections (cross-event, window closed, invalid token)
+      playBeep("error");
+      setScanResult({
+        status: "invalid_qr",
+        title: "Scan Rejected",
+        message: errRes.message || err.message || "Attendance validation failed.",
+        raw: rawQRString,
+        timestamp: timeString,
+      });
+      return false;
+    }
   };
 
   // Camera start / stop effect when full-screen scanner is open
@@ -810,41 +710,74 @@ export default function Registrations() {
     };
   }, [isScanModalOpen, cameraFacing]);
 
-  // Continuous QR scan with native BarcodeDetector if available
+  // Continuous QR scan with high-performance jsQR canvas frame processing (100% browser compatible)
   useEffect(() => {
-    if (!isScanModalOpen || !isCameraActive || !("BarcodeDetector" in window)) return;
+    if (!isScanModalOpen || !isCameraActive || !videoRef.current) return;
 
-    let scanTimer = null;
-    let isProcessing = false;
+    let animationFrameId = null;
+    let isScanning = true;
+    let lastScannedToken = "";
+    let lastScannedAt = 0;
 
-    try {
-      const barcodeDetector = new window.BarcodeDetector({ formats: ["qr_code", "code_128"] });
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
-      scanTimer = setInterval(async () => {
-        if (isProcessing || !videoRef.current || videoRef.current.readyState < 2) return;
-        try {
-          isProcessing = true;
-          const barcodes = await barcodeDetector.detect(videoRef.current);
-          if (barcodes && barcodes.length > 0) {
-            const rawVal = barcodes[0].rawValue;
-            if (rawVal) {
-              handleValidateQR(rawVal);
-            }
+    const scanFrame = () => {
+      if (!isScanning) return;
+
+      const video = videoRef.current;
+      if (
+        video &&
+        video.readyState >= 2 &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+      ) {
+        // High-speed downscaling (max 640px) for instantaneous 60fps frame analysis
+        const maxDim = 640;
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
           }
-        } catch (e) {
-          // Frame decode error ignored
-        } finally {
-          isProcessing = false;
         }
-      }, 500);
-    } catch (e) {
-      console.warn("BarcodeDetector could not be initialized:", e);
-    }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(video, 0, 0, width, height);
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "attemptBoth",
+        });
+
+        if (code && code.data && code.data.trim()) {
+          const token = code.data.trim();
+          const now = Date.now();
+          if (token !== lastScannedToken || now - lastScannedAt > 2000) {
+            lastScannedToken = token;
+            lastScannedAt = now;
+            handleValidateQR(token);
+          }
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(scanFrame);
+    };
+
+    animationFrameId = requestAnimationFrame(scanFrame);
 
     return () => {
-      if (scanTimer) clearInterval(scanTimer);
+      isScanning = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
-  }, [isScanModalOpen, isCameraActive, selectedEvent, isAttendanceOpen, participants]);
+  }, [isScanModalOpen, isCameraActive, selectedEvent]);
 
   // Escape key listener to close full-screen scanner
   useEffect(() => {
@@ -941,6 +874,46 @@ export default function Registrations() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  if (loadingEvents) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            Registrations
+          </h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Monitor real-time attendee check-ins, verify live presence, and manage event rosters.
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-500">
+          Loading event registrations...
+        </div>
+      </div>
+    );
+  }
+
+  if (!eventsList || eventsList.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            Registrations
+          </h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Monitor real-time attendee check-ins, verify live presence, and manage event rosters.
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200/90 p-12 text-center shadow-xs">
+          <Users size={36} className="text-gray-400 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-gray-800">No Events Available</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            There are currently no events created to view registrations for.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

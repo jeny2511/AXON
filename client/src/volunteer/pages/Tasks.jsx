@@ -6,17 +6,21 @@ import {
     Search,
 } from "lucide-react";
 
-import { events, tasks as mockTasks } from "../../mockData";
+import { eventService } from "../../services/eventService";
+import { volunteerService } from "../../services/volunteerService";
 
 function getEventStatus(event) {
+    if (!event) return "upcoming";
     const now = new Date();
+    const eventDate = event.eventDate || event.date;
+    if (!eventDate) return "upcoming";
 
     const start = new Date(
-        `${event.eventDate}T${event.startTime}`
+        `${new Date(eventDate).toISOString().split("T")[0]}T${event.startTime || "09:00 AM"}`
     );
 
     const end = new Date(
-        `${event.eventDate}T${event.endTime}`
+        `${new Date(eventDate).toISOString().split("T")[0]}T${event.endTime || "05:00 PM"}`
     );
 
     if (now < start) return "upcoming";
@@ -26,20 +30,26 @@ function getEventStatus(event) {
 
 function formatDate(dateStr) {
     if (!dateStr) return "";
-    return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    });
+    try {
+        return new Date(dateStr).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    } catch {
+        return String(dateStr);
+    }
 }
 
 function Tasks() {
+    const [eventsList, setEventsList] = useState([]);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [search, setSearch] = useState("");
     const [showEvents, setShowEvents] = useState(false);
     const searchRef = useRef(null);
 
     const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
 
     // Close dropdown on outside click
@@ -53,38 +63,72 @@ function Tasks() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const nearestEvent = useMemo(() => {
-        return [...events].sort((a, b) => {
-            const aTime = new Date(
-                `${a.eventDate}T${a.startTime}`
-            ).getTime();
-
-            const bTime = new Date(
-                `${b.eventDate}T${b.startTime}`
-            ).getTime();
-
-            return (
-                Math.abs(aTime - Date.now()) -
-                Math.abs(bTime - Date.now())
-            );
-        })[0];
+    // Load Events from API
+    useEffect(() => {
+        let isMounted = true;
+        async function loadEvents() {
+            try {
+                const res = await eventService.getEvents();
+                const liveEvents = res?.data || [];
+                if (isMounted) {
+                    setEventsList(liveEvents);
+                    if (liveEvents.length > 0) {
+                        setSelectedEvent(liveEvents[0]);
+                        setSearch(liveEvents[0].name);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to load events for Tasks page:", err.message);
+                if (isMounted) {
+                    setEventsList([]);
+                }
+            }
+        }
+        loadEvents();
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
+    // Load Tasks for Selected Event
     useEffect(() => {
-        if (!selectedEvent && nearestEvent) {
-            setSelectedEvent(nearestEvent);
-            setSearch(nearestEvent.name);
-        }
-    }, [nearestEvent, selectedEvent]);
+        let isMounted = true;
+        async function loadEventTasks() {
+            if (!selectedEvent) {
+                setTasks([]);
+                return;
+            }
+            const eventId = selectedEvent._id || selectedEvent.id;
+            try {
+                setLoading(true);
+                const res = await volunteerService.getTasks({ eventId });
+                if (isMounted && res && res.data) {
+                    const formatted = res.data.map((t) => ({
+                        id: t._id || t.id,
+                        _id: t._id,
+                        title: t.title || t.taskName,
+                        description: t.description || "",
+                        completed: Boolean(t.completed || t.status === "completed"),
+                        status: t.status || (t.completed ? "completed" : "pending"),
+                    }));
+                    setTasks(formatted);
+                    setLoading(false);
+                    return;
+                }
+            } catch (err) {
+                console.warn("Failed to load tasks for event:", err.message);
+            }
 
-    useEffect(() => {
-        if (selectedEvent) {
-            const eventTasks = mockTasks.filter(
-                (task) => task.eventId === selectedEvent.id
-            );
-            setTasks(eventTasks);
-            setSaved(false);
+            if (isMounted) {
+                setTasks([]);
+                setLoading(false);
+            }
         }
+
+        loadEventTasks();
+        return () => {
+            isMounted = false;
+        };
     }, [selectedEvent]);
 
     const filteredEvents = useMemo(() => {
@@ -92,27 +136,45 @@ function Tasks() {
             !search.trim() ||
             (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
         ) {
-            return events;
+            return eventsList;
         }
-        return events.filter((event) =>
+        return eventsList.filter((event) =>
             event.name.toLowerCase().includes(search.toLowerCase())
         );
-    }, [search, selectedEvent]);
+    }, [search, selectedEvent, eventsList]);
 
-    function toggleTask(taskId) {
+    async function toggleTask(taskId) {
+        const target = tasks.find((t) => t.id === taskId || t._id === taskId);
+        if (!target) return;
+
+        const newCompleted = !target.completed;
+        const newStatus = newCompleted ? "completed" : "pending";
+
+        // Optimistic UI update
         setTasks((current) =>
             current.map((task) =>
-                task.id === taskId
-                    ? { ...task, completed: !task.completed }
+                task.id === taskId || task._id === taskId
+                    ? { ...task, completed: newCompleted, status: newStatus }
                     : task
             )
         );
 
-        setSaved(false);
+        try {
+            await volunteerService.updateTask(target._id || target.id, {
+                completed: newCompleted,
+                status: newStatus,
+            });
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            console.warn("Failed to update task via API, local state saved:", err.message);
+            setSaved(true);
+        }
     }
 
     function saveChanges() {
         setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
     }
 
     if (!selectedEvent) {
@@ -175,7 +237,7 @@ function Tasks() {
                         {filteredEvents.length ? (
                             filteredEvents.map((event) => (
                                 <button
-                                    key={event.id}
+                                    key={event._id || event.id}
                                     type="button"
                                     onClick={() => {
                                         setSelectedEvent(event);
@@ -190,7 +252,7 @@ function Tasks() {
                                     </p>
 
                                     <p className="mt-1 text-xs capitalize text-gray-500">
-                                        {formatDate(event.eventDate)} ·{" "}
+                                        {formatDate(event.eventDate || event.date)} ·{" "}
                                         {getEventStatus(event)}
                                     </p>
                                 </button>
@@ -205,28 +267,38 @@ function Tasks() {
             </div>
 
             {/* Selected Event */}
-            <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h2 className="font-semibold text-gray-800">
-                            {selectedEvent.name}
-                        </h2>
+            {selectedEvent ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h2 className="font-semibold text-gray-800">
+                                {selectedEvent.name}
+                            </h2>
 
-                        <p className="mt-1 text-sm text-gray-500">
-                            {formatDate(selectedEvent.eventDate)} ·{" "}
-                            {selectedEvent.startTime} -{" "}
-                            {selectedEvent.endTime}
-                        </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                {formatDate(selectedEvent.eventDate || selectedEvent.date)} ·{" "}
+                                {selectedEvent.startTime || "10:00 AM"} -{" "}
+                                {selectedEvent.endTime || "04:00 PM"}
+                            </p>
+                        </div>
+
+                        <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium capitalize text-purple-700">
+                            {status}
+                        </span>
                     </div>
-
-                    <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium capitalize text-purple-700">
-                        {status}
-                    </span>
                 </div>
-            </div>
+            ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">
+                    No events available. Create an event in Admin to manage volunteer tasks.
+                </div>
+            )}
 
-            {/* No Tasks */}
-            {!tasks.length ? (
+            {/* Tasks Area */}
+            {loading ? (
+                <div className="p-8 text-center text-sm text-gray-500">
+                    Loading event tasks from server...
+                </div>
+            ) : !tasks.length ? (
                 <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
                     <ClipboardCheck
                         size={40}
@@ -264,7 +336,7 @@ function Tasks() {
                         <div className="space-y-3">
                             {tasks.map((task) => (
                                 <label
-                                    key={task.id}
+                                    key={task.id || task._id}
                                     className={`flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition ${task.completed
                                             ? "border-green-200 bg-green-50"
                                             : "border-gray-200 hover:bg-gray-50"
@@ -273,7 +345,7 @@ function Tasks() {
                                     <input
                                         type="checkbox"
                                         checked={task.completed}
-                                        onChange={() => toggleTask(task.id)}
+                                        onChange={() => toggleTask(task.id || task._id)}
                                         className="h-5 w-5 accent-[#24154f]"
                                     />
 
@@ -305,7 +377,7 @@ function Tasks() {
                         </div>
                     </div>
 
-                    {/* Save */}
+                    {/* Save Confirmation */}
                     <div className="flex items-center justify-end gap-3">
                         {saved && (
                             <span className="flex items-center gap-1 text-sm text-green-600">

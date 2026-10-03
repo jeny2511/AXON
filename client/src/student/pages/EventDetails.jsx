@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Calendar, FileText, ArrowLeft, Check } from "lucide-react";
 import StudentLayout from "../layouts/StudentLayout";
 import "./pages.css";
 import "./EventDetails.css";
 import {
-  getEventById,
+  fetchEventByIdApi,
+  fetchMyRegistrationsApi,
   getActiveStudentId,
   getStudentProfile,
-  isStudentRegistered,
   checkRegistrationEligibility,
-  registerStudentForEvent,
+  registerForEventApi,
 } from "../services/studentService";
+import { getAssetUrl } from "../../utils/urlUtils";
 
 function EventDetails() {
   const { eventId } = useParams();
@@ -24,8 +26,51 @@ function EventDetails() {
     year: 3,
   };
 
-  const event = getEventById(eventId || "EV001");
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isRegistered, setIsRegistered] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [imageError, setImageError] = useState(false);
+
+  const checkRegistrationStatus = async (evId) => {
+    try {
+      const myRegs = await fetchMyRegistrationsApi();
+      const match = myRegs.some(
+        (r) =>
+          (r.eventId?._id || r.eventId || r.event?._id || r.event?.id)?.toString() ===
+          evId.toString()
+      );
+      setIsRegistered(match);
+    } catch (e) {
+      // not logged in or failed
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    if (eventId) {
+      fetchEventByIdApi(eventId)
+        .then((data) => {
+          if (mounted && data) {
+            setEvent(data);
+            checkRegistrationStatus(data._id || data.id);
+          }
+        })
+        .catch((err) => {
+          console.warn("Failed to load event details from API:", err.message);
+          if (mounted) setEvent(null);
+        })
+        .finally(() => {
+          if (mounted) setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [eventId]);
 
   if (!event) {
     return (
@@ -48,23 +93,47 @@ function EventDetails() {
     );
   }
 
-  const alreadyRegistered = student?.id ? isStudentRegistered(student.id, event.id) : false;
-  const eligibility = student ? checkRegistrationEligibility(event, student) : { eligible: false, reason: "Login required." };
+  const eligibility = student
+    ? checkRegistrationEligibility(event, student)
+    : { eligible: false, reason: "Login required." };
 
-  const handleRegister = () => {
+  const rulebooksList = [];
+  if (Array.isArray(event.rulebooks) && event.rulebooks.length > 0) {
+    event.rulebooks.forEach((rb) => {
+      if (typeof rb === "string" && rb.trim()) {
+        rulebooksList.push({ name: "Event Rulebook", url: rb.trim() });
+      } else if (rb && rb.url) {
+        rulebooksList.push({ name: rb.name || "Event Rulebook", url: rb.url.trim() });
+      }
+    });
+  } else if (event.rulebook && typeof event.rulebook === "string" && event.rulebook.trim()) {
+    rulebooksList.push({ name: "Event Rulebook", url: event.rulebook.trim() });
+  } else if (event.rulebookUrl && typeof event.rulebookUrl === "string" && event.rulebookUrl.trim()) {
+    rulebooksList.push({ name: "Event Rulebook", url: event.rulebookUrl.trim() });
+  }
+
+  const handleRegister = async () => {
     if (!studentId) {
-      navigate(`/login?redirect=${encodeURIComponent(`/events/${event.id}`)}`);
+      navigate(`/login?redirect=${encodeURIComponent(`/events/${event._id || event.id}`)}`);
       return;
     }
 
-    if (!eligibility.eligible) {
-      setStatusMessage(eligibility.reason);
-      return;
+    try {
+      setStatusMessage("");
+      await registerForEventApi(event._id || event.id);
+      setIsRegistered(true);
+      setStatusMessage("You have successfully registered! Your attendance QR token is ready in My Events.");
+      // Refresh event data to update registeredCount
+      fetchEventByIdApi(eventId).then((data) => {
+        if (data) setEvent(data);
+      });
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Failed to register for event.";
+      setStatusMessage(msg);
     }
-
-    registerStudentForEvent(student.id, event.id);
-    setStatusMessage("You have successfully registered! Your attendance QR token is ready.");
   };
+
+  const posterSrc = event.poster ? getAssetUrl(event.poster) : "";
 
   return (
     <StudentLayout>
@@ -81,24 +150,35 @@ function EventDetails() {
               cursor: "pointer",
               marginBottom: "12px",
               padding: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
-            ← Back
+            <ArrowLeft size={16} /> Back
           </button>
         </div>
 
         <div className="event-details-card">
-          <img
-            src={event.poster}
-            alt={event.name}
-            className="event-details-poster"
-            onError={(e) => {
-              e.target.style.display = "none";
-            }}
-          />
+          {posterSrc && !imageError ? (
+            <img
+              src={posterSrc}
+              alt={event.name || event.title}
+              className="event-details-poster"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="event-details-poster-placeholder">
+              <div className="placeholder-content">
+                <Calendar size={42} />
+                <span className="placeholder-title">{event.name || event.title}</span>
+                <span className="placeholder-category">{event.category || "Event"}</span>
+              </div>
+            </div>
+          )}
 
           <div className="event-details-content">
-            <h1>{event.name}</h1>
+            <h1>{event.name || event.title}</h1>
             <p className="event-details-description">{event.description}</p>
 
             <div className="event-info">
@@ -106,7 +186,14 @@ function EventDetails() {
                 <strong>Category:</strong> {event.category || "General"}
               </p>
               <p>
-                <strong>Date:</strong> {event.eventDate}
+                <strong>Date:</strong>{" "}
+                {event.date
+                  ? new Date(event.date).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : event.eventDate || "TBA"}
               </p>
               <p>
                 <strong>Time:</strong> {event.startTime} - {event.endTime}
@@ -115,24 +202,32 @@ function EventDetails() {
                 <strong>Venue:</strong> {event.venue}
               </p>
               <p>
-                <strong>Speaker / Coordinator:</strong> {event.speakerName || "TCF Team"}
+                <strong>Speaker / Coordinator:</strong> {event.speaker || event.speakerName || "TCF Team"}
               </p>
               <p>
                 <strong>Eligible Departments:</strong>{" "}
-                {event.eligibleDepartments ? event.eligibleDepartments.join(", ") : "ALL"}
+                {event.eligibility?.branchCodes?.length > 0
+                  ? event.eligibility.branchCodes.join(", ")
+                  : event.eligibleDepartments?.length > 0
+                  ? event.eligibleDepartments.join(", ")
+                  : "ALL"}
               </p>
               <p>
                 <strong>Eligible Years:</strong>{" "}
-                {event.eligibleYears ? event.eligibleYears.join(", ") : "All Years"}
+                {event.eligibility?.years?.length > 0
+                  ? event.eligibility.years.join(", ")
+                  : event.eligibleYears?.length > 0
+                  ? event.eligibleYears.join(", ")
+                  : "All Years"}
               </p>
               <p>
                 <strong>Capacity:</strong> {event.registeredCount || 0} /{" "}
-                {event.participantLimit || "Unlimited"}
+                {event.participantsLimit || event.participantLimit || "Unlimited"}
               </p>
-              {event.registrationClose && (
+              {(event.registration?.closeAt || event.registrationClose) && (
                 <p>
                   <strong>Registration Closes:</strong>{" "}
-                  {new Date(event.registrationClose).toLocaleString()}
+                  {new Date(event.registration?.closeAt || event.registrationClose).toLocaleString()}
                 </p>
               )}
             </div>
@@ -154,20 +249,28 @@ function EventDetails() {
             )}
 
             <div className="event-details-actions">
-              {event.rulebook && (
-                <a
-                  href={event.rulebook}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rulebook-button"
-                >
-                  View Rulebook PDF
-                </a>
+              {rulebooksList.length > 0 ? (
+                rulebooksList.map((rb, idx) => (
+                  <a
+                    key={idx}
+                    href={getAssetUrl(rb.url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rulebook-button"
+                  >
+                    <FileText size={16} />
+                    View Rulebook
+                  </a>
+                ))
+              ) : (
+                <span className="no-rulebook-text">
+                  No rulebook available.
+                </span>
               )}
 
-              {alreadyRegistered ? (
+              {isRegistered ? (
                 <button type="button" className="register-button" disabled>
-                  Registered ✓
+                  <Check size={16} /> Registered ✓
                 </button>
               ) : !eligibility.eligible ? (
                 <button

@@ -1,6 +1,8 @@
+import { useState, useEffect } from "react";
 import {
   CalendarDays,
   Users,
+  GraduationCap,
   ClipboardCheck,
   MessageSquareText,
   ArrowUpRight,
@@ -11,27 +13,52 @@ import { Link } from "react-router-dom";
 
 import StatCard from "../components/StatCard";
 import UpcomingEvents from "../components/UpcomingEvents";
-import { events, users } from "../../mockData";
+import { adminService } from "../../services/adminService";
 
 function Dashboard() {
-  const totalEvents = events.length;
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    upcomingEvents: 0,
+    totalVolunteers: 0,
+    attendanceRate: 0,
+    totalFeedback: 0,
+    totalStudents: 0,
+    totalRegistrations: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  const totalVolunteers = users.filter(
-    (user) => user.role === "volunteer"
-  ).length;
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStats() {
+      try {
+        setLoading(true);
+        const res = await adminService.getDashboardStats();
+        if (isMounted && res) {
+          const d = res.data || res;
+          setStats({
+            totalEvents: d.totalEvents || 0,
+            upcomingEvents: d.upcomingEvents || 0,
+            totalVolunteers: d.totalVolunteers || 0,
+            attendanceRate: d.attendanceRate || 0,
+            totalFeedback: d.totalFeedback || 0,
+            totalStudents: d.totalStudents || 0,
+            totalRegistrations: d.totalRegistrations || 0,
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to load admin dashboard stats from API:", err.message);
+      }
 
-  const upcomingEvents = events.filter(
-    (event) => event.status === "upcoming"
-  );
+      if (isMounted) setLoading(false);
+    }
 
-  /*
-    Average feedback and attendance are currently shown
-    using the existing frontend data.
-
-    These values can later be connected to backend data.
-  */
-  const averageFeedback = "4.3/5";
-  const averageAttendance = "82%";
+    loadStats();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <main className="dashboard">
@@ -56,30 +83,37 @@ function Dashboard() {
       <section className="stats-grid">
 
         <StatCard
-          title="Total Events"
-          value={totalEvents}
-          subtitle={`${upcomingEvents.length} upcoming events`}
-          icon={CalendarDays}
+          title="Total Students"
+          value={stats.totalStudents}
+          subtitle="Registered participants"
+          icon={GraduationCap}
         />
 
         <StatCard
           title="Total Volunteers"
-          value={totalVolunteers}
-          subtitle="Active volunteers"
+          value={stats.totalVolunteers}
+          subtitle="Registered & active"
           icon={Users}
         />
 
         <StatCard
-          title="Average Feedback"
-          value={averageFeedback}
-          subtitle="Across completed events"
+          title="Total Events"
+          value={stats.totalEvents}
+          subtitle={`${stats.upcomingEvents} active / upcoming`}
+          icon={CalendarDays}
+        />
+
+        <StatCard
+          title="Total Feedback"
+          value={stats.totalFeedback}
+          subtitle="Student reviews received"
           icon={MessageSquareText}
         />
 
         <StatCard
           title="Average Attendance"
-          value={averageAttendance}
-          subtitle="Across all events"
+          value={`${stats.attendanceRate}%`}
+          subtitle="Verified check-in rate"
           icon={ClipboardCheck}
         />
 
@@ -101,54 +135,66 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="quick-access">
+          <div className="quick-access-list">
 
-            {/* ATTENDANCE */}
-            <Link to="/admin/attendance">
-              <div className="quick-icon">
-                <ClipboardCheck size={18} />
+            <Link to="/admin/events" className="quick-access-card">
+              <div className="quick-access-icon">
+                <CalendarDays size={20} />
               </div>
 
-              <div>
-                <strong>Attendance</strong>
-                <span>Manage volunteer attendance</span>
+              <div className="quick-access-info">
+                <h4>Manage Events</h4>
+                <p>Create, update and track status of events</p>
               </div>
 
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={18} className="quick-access-arrow" />
             </Link>
 
-            {/* TASK PROGRESS */}
-            <Link to="/admin/tasks">
-              <div className="quick-icon">
-                <ListTodo size={18} />
+            <Link to="/admin/volunteers" className="quick-access-card">
+              <div className="quick-access-icon">
+                <Users size={20} />
               </div>
 
-              <div>
-                <strong>Task Progress</strong>
-                <span>Manage volunteer tasks</span>
+              <div className="quick-access-info">
+                <h4>Volunteers Directory</h4>
+                <p>View committee members and active volunteers</p>
               </div>
 
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={18} className="quick-access-arrow" />
             </Link>
 
-            {/* VOLUNTEERS */}
-            <Link to="/admin/volunteers">
-              <div className="quick-icon">
-                <Users size={18} />
+            <Link to="/admin/task-progress" className="quick-access-card">
+              <div className="quick-access-icon">
+                <ListTodo size={20} />
               </div>
 
-              <div>
-                <strong>Volunteers</strong>
-                <span>View volunteer information</span>
+              <div className="quick-access-info">
+                <h4>Task Progress</h4>
+                <p>Assign and monitor volunteer duties</p>
               </div>
 
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={18} className="quick-access-arrow" />
+            </Link>
+
+            <Link to="/admin/attendance" className="quick-access-card">
+              <div className="quick-access-icon">
+                <ClipboardCheck size={20} />
+              </div>
+
+              <div className="quick-access-info">
+                <h4>Attendance Records</h4>
+                <p>Monitor real-time participant attendance</p>
+              </div>
+
+              <ArrowUpRight size={18} className="quick-access-arrow" />
             </Link>
 
           </div>
+
         </div>
 
       </section>
+
     </main>
   );
 }

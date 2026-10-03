@@ -10,7 +10,6 @@ import {
   Award,
   Filter,
 } from "lucide-react";
-import { notifications as initialNotifications } from "../../mockData/notifications";
 import { getAuthUser } from "../../services/authService";
 
 function Notifications() {
@@ -26,11 +25,7 @@ function Notifications() {
         console.error(e);
       }
     }
-    // Filter notifications for this volunteer or general notifications
-    const userNotifs = initialNotifications.filter(
-      (n) => n.userId === volunteerId || !n.userId || n.userId === "all"
-    );
-    return userNotifs.length > 0 ? userNotifs : initialNotifications.slice(0, 6);
+    return [];
   });
 
   const [filter, setFilter] = useState("all");

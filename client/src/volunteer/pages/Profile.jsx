@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   Award,
   BookOpen,
@@ -14,41 +14,45 @@ import {
   User,
 } from "lucide-react";
 
-import { users } from "../../mockData";
+import { getCurrentUser, getUserProfile } from "../../services/authService";
 
 function Profile() {
-  // Current active volunteer user
-  const currentVolunteer = useMemo(() => {
-    try {
-      const stored = localStorage.getItem("axon_volunteer_user");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const match = users.find(
-          (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
-        );
-        if (match) return match;
-      }
-    } catch (e) {}
+  const [profile, setProfile] = useState(getCurrentUser() || {});
+  const [loading, setLoading] = useState(true);
 
-    return (
-      users.find((u) => u.id === "VL002") ||
-      users.find((u) => u.role === "volunteer") || {
-        id: "VL002",
-        fullName: "Dhruvi Patel",
-        enrollmentNo: "220130108002",
-        email: "dhruvi@vgec.ac.in",
-        phone: "9876543221",
-        department: "IT",
-        year: 3,
-        semester: 5,
-        designation: "President",
-        isActive: true,
-      }
-    );
+  useEffect(() => {
+    let mounted = true;
+    getUserProfile()
+      .then((res) => {
+        if (mounted && res && res.data) {
+          setProfile(res.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch volunteer profile:", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  const currentVolunteer = {
+    fullName: profile.fullName || "Volunteer Member",
+    enrollmentNo: profile.enrollmentNo || profile.enrollmentNumber || "—",
+    email: profile.email || "—",
+    phone: profile.phone || "—",
+    department: profile.department || "IT",
+    year: profile.year || 3,
+    semester: profile.semester || 5,
+    designation: profile.designation || "Volunteer",
+    isActive: profile.accountStatus === "active" || profile.isActive !== false,
+  };
+
   // Admin-assigned designation (e.g., President, Vice President)
-  const volunteerRoleTitle = currentVolunteer.designation || "President";
+  const volunteerRoleTitle = currentVolunteer.designation || "Volunteer";
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">

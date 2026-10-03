@@ -1,8 +1,14 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Route imports
 import authRoutes from "./routes/authRoutes.js";
@@ -17,6 +23,7 @@ import learningRoutes from "./routes/learningRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import volunteerRoutes from "./routes/volunteerRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -33,6 +40,20 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static uploads
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(uploadsDir)
+);
 
 // Health Check Endpoint
 app.get("/api/health", (req, res) => {
@@ -52,6 +73,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/certificates", certificateRoutes);
 app.use("/api/gallery", galleryRoutes);
+app.use("/api/reports", reportRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/volunteer", volunteerRoutes);

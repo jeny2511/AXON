@@ -20,7 +20,9 @@ import {
   Check,
   ChevronDown,
 } from "lucide-react";
-import { events as mockEvents } from "../../mockData";
+import { eventService } from "../../services/eventService";
+import { registrationService } from "../../services/registrationService";
+import { attendanceService } from "../../services/attendanceService";
 
 // ============================================================================
 // HELPER FUNCTIONS & SHARED STORAGE UTILITIES
@@ -64,7 +66,7 @@ function formatTime(timeStr) {
 function getEventWindowStatus(ev) {
   if (!ev) return false;
   if (ev.status === "ongoing") return true;
-  if (ev.attendanceStatus === "open" || ev.id === "EV002") return true;
+  if (ev.attendanceStatus === "open") return true;
 
   if (ev.attendanceOpen && ev.attendanceClose) {
     const now = new Date();
@@ -75,191 +77,81 @@ function getEventWindowStatus(ev) {
   return false;
 }
 
-/**
- * Default sample roster for events when localStorage is not yet populated
- */
-const DEFAULT_STUDENT_POOL = [
-  { enrollmentNo: "24IT001", name: "Priyansh Patel", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT002", name: "Jinal Shah", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE015", name: "Meet Desai", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC007", name: "Krisha Vora", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT010", name: "Dhruv Mehta", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107054", name: "Jeny Thesiya", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107055", name: "Archi Patel", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107056", name: "Riya Shah", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "220130107057", name: "Meet Parmar", department: "ICT", year: "4th Year", semester: 7 },
-  { enrollmentNo: "220130107058", name: "Krishna Dave", department: "IT", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "220130107059", name: "Harsh Joshi", department: "CE", year: "3rd Year", semester: 5 },
-  { enrollmentNo: "24IT018", name: "Tanvi Panchal", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE032", name: "Smit Solanki", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC021", name: "Aayush Trivedi", department: "EC", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24ICT009", name: "Nirav Barot", department: "ICT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24IT025", name: "Khushi Prajapati", department: "IT", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24CE044", name: "Yash Makwana", department: "CE", year: "2nd Year", semester: 3 },
-  { enrollmentNo: "24EC035", name: "Diya Rathod", department: "EC", year: "2nd Year", semester: 3 },
-];
-
-/**
- * Event-specific student registration mappings:
- * Each event has its OWN specific registered students based on registrations in AXON.
- * Only students registered for that specific event are shown in that event's sheet!
- */
-const EVENT_REGISTERED_STUDENTS_MAP = {
-  EV001: [
-    "220130107054", // Jeny Thesiya (REG001)
-    "220130107055", // Archi Patel (REG006)
-    "24IT001",      // Priyansh Patel
-    "24IT002",      // Jinal Shah
-    "24CE015",      // Meet Desai
-    "24EC007",      // Krisha Vora
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-  ],
-  EV002: [
-    "220130107054", // Jeny Thesiya (REG002)
-    "220130107059", // Harsh Joshi (REG014)
-    "24IT010",      // Dhruv Mehta
-    "24IT018",      // Tanvi Panchal
-    "24CE032",      // Smit Solanki
-    "24ICT009",     // Nirav Barot
-    "24IT025",      // Khushi Prajapati
-  ],
-  EV003: [
-    "220130107054", // Jeny Thesiya (REG003)
-    "220130107055", // Archi Patel (REG007)
-    "220130107056", // Riya Shah
-    "24CE015",      // Meet Desai
-    "24EC021",      // Aayush Trivedi
-    "24CE044",      // Yash Makwana
-  ],
-  EV004: [
-    "220130107054", // Jeny Thesiya (REG004)
-    "220130107057", // Meet Parmar (REG010)
-    "24IT001",      // Priyansh Patel
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-  EV005: [
-    "220130107054", // Jeny Thesiya (REG005)
-    "220130107056", // Riya Shah (REG009)
-    "24IT002",      // Jinal Shah
-    "24EC007",      // Krisha Vora
-    "24IT025",      // Khushi Prajapati
-    "24CE044",      // Yash Makwana
-  ],
-  EV006: [
-    "220130107057", // Meet Parmar (REG011)
-    "24CE015",      // Meet Desai
-    "24IT018",      // Tanvi Panchal
-    "24ICT009",     // Nirav Barot
-  ],
-  EV007: [
-    "220130107058", // Krishna Dave (REG012)
-    "24IT001",      // Priyansh Patel
-    "24IT010",      // Dhruv Mehta
-    "24EC021",      // Aayush Trivedi
-  ],
-  EV008: [
-    "220130107058", // Krishna Dave (REG013)
-    "24IT002",      // Jinal Shah
-    "24CE032",      // Smit Solanki
-    "24EC035",      // Diya Rathod
-  ],
-};
-
 // ============================================================================
 // MAIN COMPONENT: AttendanceSheet (Opened in New Tab)
-// Complete full-screen attendance sheet with all functionalities:
-// - Live search by student name, enrollment, or department
-// - Filter by status (All, Present, Absent)
-// - Sorting (by serial, enrollment, name, branch)
-// - Interactive attendance marking (Present / Absent)
-// - Manual attendance check-in modal
-// - Official Print Sheet layout with coordinator signature section
-// - CSV Export (All participants & Present only)
 // ============================================================================
 export default function AttendanceSheet() {
   const { eventId } = useParams();
   const navigate = useNavigate();
 
-  // Find target event by ID or fallback to first event
-  const currentEvent = useMemo(() => {
-    return mockEvents.find((e) => e.id === eventId) || mockEvents[0];
+  const [liveEvent, setLiveEvent] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (eventId) {
+      setLoading(true);
+      Promise.all([
+        eventService.getEventById(eventId).catch(() => null),
+        registrationService.getEventRegistrations(eventId).catch(() => null),
+        attendanceService.getEventAttendance(eventId).catch(() => null),
+      ]).then(([eventRes, regsRes, attRes]) => {
+        if (!isMounted) return;
+        if (eventRes?.data) {
+          setLiveEvent(eventRes.data);
+        }
+        const attList = attRes?.data || [];
+        const presentEnrollments = new Map();
+        attList.forEach((a) => {
+          const s = a.studentId || {};
+          const enroll = (s.enrollmentNumber || s.enrollmentNo || "").trim().toUpperCase();
+          if (enroll) {
+            presentEnrollments.set(enroll, a.attendanceTime ? new Date(a.attendanceTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "Marked");
+          }
+        });
+
+        if (regsRes?.data && Array.isArray(regsRes.data)) {
+          const mapped = regsRes.data.map((reg) => {
+            const student = reg.studentId || {};
+            const enroll = (student.enrollmentNumber || student.enrollmentNo || "N/A").trim().toUpperCase();
+            const isPresent = reg.status === "attended" || presentEnrollments.has(enroll);
+            const checkInTime = presentEnrollments.get(enroll) || (reg.checkedInAt ? new Date(reg.checkedInAt).toLocaleTimeString("en-IN") : null);
+            return {
+              id: reg._id,
+              registrationId: reg._id,
+              eventId: eventId,
+              enrollmentNo: enroll,
+              name: student.fullName || student.name || "Student",
+              department: student.department || "IT",
+              year: student.year ? `${student.year} Year` : "2nd Year",
+              semester: student.semester || 3,
+              status: isPresent ? "present" : "absent",
+              checkInTime: checkInTime,
+              qrCode: reg.qrCode || `QR-${eventId}-${enroll}`,
+            };
+          });
+          setParticipants(mapped);
+        } else {
+          setParticipants([]);
+        }
+      }).finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, [eventId]);
+
+  const currentEvent = liveEvent;
 
   const isAttendanceOpen = useMemo(() => {
     return getEventWindowStatus(currentEvent);
   }, [currentEvent]);
-
-  // Load participants from localStorage or synthesize default roster for this specific event
-  const [participants, setParticipants] = useState(() => {
-    if (!currentEvent) return [];
-    try {
-      const stored = localStorage.getItem(getStorageKey(currentEvent.id));
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error("Failed to load attendance from storage:", e);
-    }
-
-    // 1. Get registered enrollment numbers specifically for this event
-    let registeredEnrollments = EVENT_REGISTERED_STUDENTS_MAP[currentEvent.id];
-
-    if (!registeredEnrollments) {
-      registeredEnrollments = DEFAULT_STUDENT_POOL
-        .filter((student) => {
-          const deptMatch =
-            !currentEvent.eligibleDepartments ||
-            currentEvent.eligibleDepartments.length === 0 ||
-            currentEvent.eligibleDepartments.includes(student.department);
-          const yearNum = typeof student.year === "string" ? parseInt(student.year[0]) : student.year;
-          const yearMatch =
-            !currentEvent.eligibleYears ||
-            currentEvent.eligibleYears.length === 0 ||
-            currentEvent.eligibleYears.includes(yearNum);
-          return deptMatch && yearMatch;
-        })
-        .slice(0, currentEvent.participantLimit || 8)
-        .map((s) => s.enrollmentNo);
-    }
-
-    // 2. Synthesize ONLY the students registered for this specific event
-    return DEFAULT_STUDENT_POOL
-      .filter((student) => registeredEnrollments.includes(student.enrollmentNo))
-      .map((student, index) => {
-        const isPresent = index < 3;
-        const randomMinute = 10 + index * 3;
-        const formattedMin = randomMinute < 10 ? `0${randomMinute}` : randomMinute;
-
-        return {
-          id: `REG-${currentEvent.id}-${student.enrollmentNo}`,
-          eventId: currentEvent.id,
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
-          department: student.department,
-          year: student.year,
-          semester: student.semester || 3,
-          status: isPresent ? "present" : "absent",
-          checkInTime: isPresent ? `10:${formattedMin} AM` : null,
-          qrCode: `QR-${currentEvent.id}-${student.enrollmentNo}`,
-        };
-      });
-  });
-
-  // Sync state changes to localStorage
-  useEffect(() => {
-    if (currentEvent && participants.length > 0) {
-      try {
-        localStorage.setItem(
-          getStorageKey(currentEvent.id),
-          JSON.stringify(participants)
-        );
-      } catch (e) {
-        console.error("Failed to save attendance:", e);
-      }
-    }
-  }, [currentEvent, participants]);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -316,36 +208,21 @@ export default function AttendanceSheet() {
   }, [participants, searchQuery, statusFilter, departmentFilter, sortBy, isAttendanceOpen]);
 
   // Toggle single student's status
-  const handleToggleAttendance = (enrollmentNo) => {
+  const handleToggleAttendance = async (enrollmentNo) => {
     if (!isAttendanceOpen) {
       alert(`Attendance Window for "${currentEvent?.name}" is not open. Window is managed in Manage Events.`);
       return;
     }
+    const student = participants.find((p) => p.enrollmentNo === enrollmentNo);
+    if (!student) return;
 
-    setParticipants((prev) =>
-      prev.map((p) => {
-        if (p.enrollmentNo === enrollmentNo) {
-          const isCurrentlyPresent = p.status === "present";
-          const now = new Date();
-          const timeString = now.toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          });
-
-          return {
-            ...p,
-            status: isCurrentlyPresent ? "absent" : "present",
-            checkInTime: isCurrentlyPresent ? null : timeString,
-          };
-        }
-        return p;
-      })
-    );
+    if (student.status !== "present") {
+      await handleMarkPresent(enrollmentNo);
+    }
   };
 
-  // Mark Present manually
-  const handleMarkPresent = (enrollmentNo) => {
+  // Mark Present manually via live backend API
+  const handleMarkPresent = async (enrollmentNo) => {
     if (!isAttendanceOpen) {
       setFeedbackNotice({
         type: "error",
@@ -354,46 +231,43 @@ export default function AttendanceSheet() {
       return false;
     }
 
-    const targetStudent = participants.find(
-      (p) => p.enrollmentNo.toLowerCase() === enrollmentNo.trim().toLowerCase()
-    );
+    try {
+      const targetStudent = participants.find(
+        (p) => p.enrollmentNo.toLowerCase() === enrollmentNo.trim().toLowerCase()
+      );
 
-    if (!targetStudent) {
+      const res = await attendanceService.markManual({
+        enrollmentNo,
+        eventId: currentEvent?._id || currentEvent?.id,
+      });
+
+      const now = new Date();
+      const timeString = now.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      setParticipants((prev) =>
+        prev.map((p) =>
+          p.enrollmentNo.toLowerCase() === enrollmentNo.trim().toLowerCase()
+            ? { ...p, status: "present", checkInTime: timeString }
+            : p
+        )
+      );
+
+      setFeedbackNotice({
+        type: "success",
+        text: res.message || `✓ Verified: ${targetStudent ? targetStudent.name : enrollmentNo} marked Present.`,
+      });
+      return true;
+    } catch (err) {
       setFeedbackNotice({
         type: "error",
-        text: `Student with enrollment "${enrollmentNo}" is not registered.`,
+        text: err.message || "Failed to mark attendance.",
       });
       return false;
     }
-
-    if (targetStudent.status === "present") {
-      setFeedbackNotice({
-        type: "info",
-        text: `${targetStudent.name} (${targetStudent.enrollmentNo}) is already marked Present.`,
-      });
-      return true;
-    }
-
-    const now = new Date();
-    const timeString = now.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-    setParticipants((prev) =>
-      prev.map((p) =>
-        p.enrollmentNo.toLowerCase() === enrollmentNo.trim().toLowerCase()
-          ? { ...p, status: "present", checkInTime: timeString }
-          : p
-      )
-    );
-
-    setFeedbackNotice({
-      type: "success",
-      text: `✓ Verified: ${targetStudent.name} marked Present at ${timeString}.`,
-    });
-    return true;
   };
 
   // Export Sheet to CSV

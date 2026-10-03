@@ -1,18 +1,19 @@
 // Student Shared Service
-import { attendance as mockAttendance } from "../../mockData/attendance";
-import { events as mockEvents } from "../../mockData/events";
-import { registrations as mockRegistrations } from "../../mockData/registrations";
-import { certificates as mockCertificates } from "../../mockData/certificates";
-import { feedback as mockFeedback } from "../../mockData/feedback";
-import { gallery as mockGallery } from "../../mockData/gallery";
-import { aboutTCF as mockAboutTCF } from "../../mockData/about";
-import { notifications as mockNotifications } from "../../mockData/notifications";
-import { learning as mockLearning } from "../../mockData/learning";
-import { users as mockUsers } from "../../mockData/users";
+import { aboutTCF as staticAboutTCF } from "../../mockData/about";
+
+import eventService from "../../services/eventService";
+import { registrationService } from "../../services/registrationService";
+import { attendanceService } from "../../services/attendanceService";
+import { feedbackService } from "../../services/feedbackService";
+import { certificateService } from "../../services/certificateService";
+import { galleryService } from "../../services/galleryService";
+import { learningService } from "../../services/learningService";
+import { getAuthUser } from "../../services/authService";
 
 // Active student session helper (returns null for Guest Mode)
 export function getActiveStudentId() {
-  return localStorage.getItem("axon_auth_student_id") || null;
+  const user = getAuthUser();
+  return user?.id || user?._id || localStorage.getItem("axon_auth_student_id") || null;
 }
 
 export function setActiveStudentId(studentId) {
@@ -24,125 +25,216 @@ export function setActiveStudentId(studentId) {
 }
 
 // --------------------------------------------
-// EVENTS
+// EVENTS (LIVE API INTEGRATION)
 // --------------------------------------------
 
+export async function fetchAllEventsApi(params = {}) {
+  try {
+    const res = await eventService.getEvents(params);
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch events from API:", err);
+    throw err;
+  }
+}
+
+export async function fetchEventByIdApi(id) {
+  try {
+    const res = await eventService.getEventById(id);
+    return res.data || null;
+  } catch (err) {
+    console.error(`Failed to fetch event ${id} from API:`, err);
+    throw err;
+  }
+}
+
 export function getAllEvents() {
-  return mockEvents;
+  return [];
+}
+
+export async function fetchGalleryApi(params = {}) {
+  try {
+    const res = await galleryService.getGallery(params);
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch gallery from API:", err);
+    throw err;
+  }
+}
+
+export async function fetchLearningResourcesApi(params = {}) {
+  try {
+    const res = await learningService.getResources(params);
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch learning resources from API:", err);
+    throw err;
+  }
+}
+
+export async function fetchLearningResourceByIdApi(id) {
+  try {
+    const res = await learningService.getResourceById(id);
+    return res.data || null;
+  } catch (err) {
+    console.error(`Failed to fetch learning resource ${id} from API:`, err);
+    throw err;
+  }
 }
 
 export function getGallery() {
-  return mockGallery;
+  return [];
 }
 
 export function getUpcomingEvents() {
-  return mockEvents.filter((event) => event.status === "upcoming");
+  return [];
 }
 
 export function getOngoingEvents() {
-  return mockEvents.filter((event) => event.status === "ongoing");
+  return [];
 }
 
 export function getCompletedEvents() {
-  return mockEvents.filter((event) => event.status === "completed");
+  return [];
 }
 
 export function getEventById(eventId) {
-  return mockEvents.find((event) => event.id === eventId);
+  return null;
 }
 
 // --------------------------------------------
-// REGISTRATIONS
+// REGISTRATIONS (LIVE API + HYDRATION)
 // --------------------------------------------
 
-// Get stored custom registrations or fallback to mock registrations
-function getAllRegistrations() {
-  const stored = localStorage.getItem("axon_custom_registrations");
-  if (stored) {
-    try {
-      const custom = JSON.parse(stored);
-      return [...mockRegistrations, ...custom];
-    } catch {
-      return mockRegistrations;
-    }
+// --------------------------------------------
+// REGISTRATIONS (LIVE API + SYNCHRONOUS COMPATIBILITY)
+// --------------------------------------------
+
+export async function fetchMyRegistrationsApi() {
+  try {
+    const res = await registrationService.getMyRegistrations();
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch registrations from API:", err);
+    throw err;
   }
-  return mockRegistrations;
+}
+
+export async function registerForEventApi(eventId) {
+  try {
+    const res = await registrationService.registerForEvent(eventId);
+    return res.data;
+  } catch (err) {
+    console.error("Failed to register for event via API:", err);
+    throw err;
+  }
+}
+
+export async function cancelRegistrationApi(registrationId, reason = "") {
+  try {
+    const res = await registrationService.cancelRegistration(registrationId, reason);
+    return res.data;
+  } catch (err) {
+    console.error("Failed to cancel registration via API:", err);
+    throw err;
+  }
 }
 
 export function getStudentRegistrations(studentId) {
-  const allRegs = getAllRegistrations();
-  return allRegs.filter((reg) => reg.studentId === studentId);
+  return [];
 }
 
 export function isStudentRegistered(studentId, eventId) {
-  const studentRegs = getStudentRegistrations(studentId);
-  return studentRegs.some(
-    (reg) => reg.eventId === eventId && reg.status === "registered"
-  );
+  return false;
 }
 
-// Check the 4 mandatory business rules for registration eligibility
+// Check mandatory business rules for registration eligibility
 export function checkRegistrationEligibility(event, student) {
   if (!event || !student) {
     return { eligible: false, reason: "Invalid event or student data." };
   }
 
-  // 1. Is event open for registration?
-  if (event.registrationStatus !== "open") {
+  // 1. Is event status open for registration?
+  const allowedStatuses = ["published", "upcoming", "registration_open"];
+  const status = (event.status || "published").toLowerCase();
+  if (!allowedStatuses.includes(status)) {
     return {
       eligible: false,
       reason:
-        event.registrationStatus === "full"
-          ? "Event registration is full."
+        status === "completed"
+          ? "Event has already concluded."
+          : status === "cancelled"
+          ? "Event has been cancelled."
           : "Event registration is closed.",
     };
   }
 
-  // 2. Has registration deadline passed?
-  if (event.registrationClose) {
-    const closeDate = new Date(event.registrationClose);
-    const now = new Date();
-    if (now > closeDate) {
-      return { eligible: false, reason: "Registration deadline has passed." };
-    }
+  // 2. Has registration window opened yet?
+  const now = new Date();
+  const openAt = event.registration?.openAt || event.registrationOpen;
+  if (openAt && now < new Date(openAt)) {
+    return {
+      eligible: false,
+      reason: `Registration opens on ${new Date(openAt).toLocaleDateString()}.`,
+    };
   }
 
-  // 3. Has capacity been reached?
-  if (
-    event.participantLimit &&
-    event.registeredCount &&
-    event.registeredCount >= event.participantLimit
-  ) {
+  // 3. Has registration deadline passed?
+  const closeAt = event.registration?.closeAt || event.registrationClose;
+  if (closeAt && now > new Date(closeAt)) {
+    return { eligible: false, reason: "Registration deadline has passed." };
+  }
+
+  // 4. Has capacity been reached?
+  const limit = event.participantsLimit || event.participantLimit;
+  const currentCount = event.registeredCount || 0;
+  if (limit && currentCount >= limit) {
     return { eligible: false, reason: "Event has reached maximum capacity." };
   }
 
-  // 4. Branch eligibility
-  if (
-    event.eligibleDepartments &&
-    !event.eligibleDepartments.includes("ALL") &&
-    !event.eligibleDepartments.includes(student.department)
-  ) {
-    return {
-      eligible: false,
-      reason: `Event is restricted to ${event.eligibleDepartments.join(", ")} department(s).`,
-    };
-  }
+  // 5. Eligibility rules (if enabled)
+  const eligibility = event.eligibility || {};
+  const isEligibilityEnabled = eligibility.enabled !== false && (
+    (eligibility.years && eligibility.years.length > 0) ||
+    (eligibility.branchCodes && eligibility.branchCodes.length > 0) ||
+    (event.eligibleDepartments && event.eligibleDepartments.length > 0) ||
+    (event.eligibleYears && event.eligibleYears.length > 0)
+  );
 
-  // 5. Academic year eligibility
-  if (
-    event.eligibleYears &&
-    student.year &&
-    !event.eligibleYears.includes(student.year)
-  ) {
-    return {
-      eligible: false,
-      reason: `Event is restricted to Year ${event.eligibleYears.join(", ")} students.`,
-    };
-  }
+  if (isEligibilityEnabled) {
+    // Academic year check
+    const allowedYears = (eligibility.years || event.eligibleYears || []).map(Number);
+    if (allowedYears.length > 0) {
+      let studentYear = student.currentYear || student.year;
+      if (typeof studentYear === "string") {
+        studentYear = parseInt(studentYear, 10);
+      }
+      studentYear = Number(studentYear) || 1;
+      if (!allowedYears.includes(studentYear)) {
+        return {
+          eligible: false,
+          reason: `Event is restricted to Year ${allowedYears.join(", ")} students.`,
+        };
+      }
+    }
 
-  // 6. Already registered?
-  if (isStudentRegistered(student.id, event.id)) {
-    return { eligible: false, reason: "You are already registered for this event." };
+    // Branch / Department check
+    const allowedDepts = (
+      eligibility.branchCodes ||
+      eligibility.branches ||
+      event.eligibleDepartments ||
+      []
+    ).map((d) => String(d).toUpperCase());
+
+    if (allowedDepts.length > 0 && !allowedDepts.includes("ALL")) {
+      const studentDept = String(student.department || student.branch || "").toUpperCase();
+      if (studentDept && !allowedDepts.includes(studentDept)) {
+        return {
+          eligible: false,
+          reason: `Event is restricted to ${allowedDepts.join(", ")} department(s).`,
+        };
+      }
+    }
   }
 
   return { eligible: true, reason: "" };
@@ -158,79 +250,80 @@ export function registerStudentForEvent(studentId, eventId) {
     status: "registered",
     qrCode: `QR-${eventId}-${studentId}`,
   };
-
-  const stored = localStorage.getItem("axon_custom_registrations");
-  let custom = [];
-  if (stored) {
-    try {
-      custom = JSON.parse(stored);
-    } catch {
-      custom = [];
-    }
-  }
-  custom.push(newReg);
-  localStorage.setItem("axon_custom_registrations", JSON.stringify(custom));
-
   return newReg;
 }
 
 // Get full registered event details
 export function getRegisteredEvents(studentId) {
-  const studentRegistrations = getStudentRegistrations(studentId);
-
-  return studentRegistrations
-    .map((registration) => {
-      const event = getEventById(registration.eventId);
-      if (!event) return null;
-
-      return {
-        ...event,
-        registrationId: registration.registrationId,
-        registrationDate: registration.registrationDate,
-        registrationStatus: registration.status,
-        qrCode: registration.qrCode,
-      };
-    })
-    .filter(Boolean);
+  return [];
 }
 
 // --------------------------------------------
 // CERTIFICATES
 // --------------------------------------------
 
+export async function fetchMyCertificatesApi() {
+  try {
+    const res = await certificateService.getMyCertificates();
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch student certificates from API:", err);
+    throw err;
+  }
+}
+
+export async function checkCertificateEligibilityApi(eventId) {
+  try {
+    const res = await certificateService.checkEligibility(eventId);
+    return res;
+  } catch (err) {
+    console.error("Failed to check certificate eligibility from API:", err);
+    throw err;
+  }
+}
+
 export function getStudentCertificates(studentId) {
-  return mockCertificates.filter(
-    (certificate) => certificate.studentId === studentId
-  );
+  return [];
 }
 
 export function getStudentCertificateForEvent(studentId, eventId) {
-  return mockCertificates.find(
-    (cert) => cert.studentId === studentId && cert.eventId === eventId
-  );
+  return null;
 }
 
 // --------------------------------------------
 // FEEDBACK
 // --------------------------------------------
 
+export async function fetchMyFeedbackApi() {
+  try {
+    const res = await feedbackService.getMyFeedback();
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch student feedback from API:", err);
+    throw err;
+  }
+}
+
+export async function submitFeedbackApi(feedbackData) {
+  try {
+    const res = await feedbackService.submitFeedback(feedbackData);
+    return res.data;
+  } catch (err) {
+    console.error("Failed to submit feedback via API:", err);
+    throw err;
+  }
+}
+
 export function getStudentFeedback(studentId) {
-  return mockFeedback.filter((item) => item.studentId === studentId);
+  return [];
 }
 
 export function hasSubmittedFeedback(studentId, eventId) {
-  const localSaved = localStorage.getItem(
-    `axon_feedback_${studentId}_${eventId}`
-  );
-  if (localSaved) return true;
-
-  return mockFeedback.some(
-    (item) => item.studentId === studentId && item.eventId === eventId
-  );
+  return false;
 }
 
 export function submitStudentFeedback(studentId, eventId, data) {
-  const feedbackData = {
+  return {
     feedbackId: `FB_${studentId}_${eventId}`,
     studentId,
     eventId,
@@ -242,38 +335,32 @@ export function submitStudentFeedback(studentId, eventId, data) {
     submittedAt: new Date().toISOString(),
     isAnonymous: false,
   };
-
-  localStorage.setItem(
-    `axon_feedback_${studentId}_${eventId}`,
-    JSON.stringify(feedbackData)
-  );
-
-  return feedbackData;
 }
 
 // --------------------------------------------
 // ATTENDANCE
 // --------------------------------------------
 
+export async function fetchMyAttendanceApi() {
+  try {
+    const res = await attendanceService.getMyAttendance();
+    return res.data || [];
+  } catch (err) {
+    console.error("Failed to fetch student attendance from API:", err);
+    throw err;
+  }
+}
+
 export function getStudentAttendance(studentId) {
-  return mockAttendance.filter((item) => item.studentId === studentId);
+  return [];
 }
 
 export function getStudentAttendanceForEvent(studentId, eventId) {
-  return mockAttendance.find(
-    (item) => item.studentId === studentId && item.eventId === eventId
-  );
+  return null;
 }
 
-// Get events where student attendance is present
 export function getStudentCompletedEvents(studentId) {
-  const presentAttendance = mockAttendance.filter(
-    (item) => item.studentId === studentId && item.status === "present"
-  );
-
-  return presentAttendance
-    .map((att) => getEventById(att.eventId))
-    .filter(Boolean);
+  return [];
 }
 
 // --------------------------------------------
@@ -281,31 +368,15 @@ export function getStudentCompletedEvents(studentId) {
 // --------------------------------------------
 
 export function getNearestUpcomingEvent() {
-  const upcomingEvents = getUpcomingEvents();
-
-  if (upcomingEvents.length === 0) {
-    return null;
-  }
-
-  return upcomingEvents.reduce((nearest, event) => {
-    return new Date(event.eventDate) < new Date(nearest.eventDate)
-      ? event
-      : nearest;
-  });
+  return null;
 }
 
 export function getDashboardStats(studentId) {
-  const registeredEvents = getStudentRegistrations(studentId).filter(
-    (r) => r.status === "registered"
-  );
-  const completedEvents = getStudentCompletedEvents(studentId);
-  const studentCertificates = getStudentCertificates(studentId);
-
   return {
-    upcomingEvents: getUpcomingEvents().length,
-    registeredEvents: registeredEvents.length,
-    completedEvents: completedEvents.length,
-    certificates: studentCertificates.length,
+    upcomingEvents: 0,
+    registeredEvents: 0,
+    completedEvents: 0,
+    certificates: 0,
   };
 }
 
@@ -314,7 +385,7 @@ export function getDashboardStats(studentId) {
 // --------------------------------------------
 
 export function getAboutTCF() {
-  return mockAboutTCF;
+  return staticAboutTCF;
 }
 
 // --------------------------------------------
@@ -322,16 +393,15 @@ export function getAboutTCF() {
 // --------------------------------------------
 
 export function getLearningResources() {
-  return mockLearning;
+  return [];
 }
 
 export function getFeaturedLearningResources() {
-  return mockLearning.filter((resource) => resource.isFeatured === true);
+  return [];
 }
 
 export function getLearningResourcesByCategory(category) {
-  if (!category || category === "All") return mockLearning;
-  return mockLearning.filter((resource) => resource.category === category);
+  return [];
 }
 
 // --------------------------------------------
@@ -339,9 +409,7 @@ export function getLearningResourcesByCategory(category) {
 // --------------------------------------------
 
 export function getStudentNotifications(studentId) {
-  return mockNotifications.filter(
-    (notification) => notification.userId === studentId
-  );
+  return [];
 }
 
 // --------------------------------------------
@@ -349,6 +417,19 @@ export function getStudentNotifications(studentId) {
 // --------------------------------------------
 
 export function getStudentProfile(studentId) {
+  const user = getAuthUser();
+  if (user && (user.id === studentId || user._id === studentId || user.role === "student")) {
+    return {
+      ...user,
+      id: user.id || user._id,
+      fullName: user.fullName || user.name || "Student",
+      enrollmentNo: user.enrollmentNo || user.enrollmentNumber || "",
+      department: user.department || "IT",
+      year: user.year || 3,
+      batch: user.batch || `${2025 - (user.year || 3) + 1}-${2029 - (user.year || 3) + 1}`,
+    };
+  }
+
   const stored = localStorage.getItem(`axon_profile_${studentId}`);
   if (stored) {
     try {
@@ -358,19 +439,11 @@ export function getStudentProfile(studentId) {
     }
   }
 
-  const user = mockUsers.find(
-    (u) => u.id === studentId && u.role === "student"
-  );
-  if (!user) return null;
-
-  return {
-    ...user,
-    batch: user.batch || `${2025 - (user.year || 3) + 1}-${2029 - (user.year || 3) + 1}`,
-  };
+  return null;
 }
 
 export function updateStudentProfile(studentId, updatedData) {
-  const current = getStudentProfile(studentId);
+  const current = getStudentProfile(studentId) || {};
   const merged = { ...current, ...updatedData };
   localStorage.setItem(`axon_profile_${studentId}`, JSON.stringify(merged));
   return merged;

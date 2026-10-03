@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 
-import { events, feedbackForms } from "../../mockData";
+import { eventService } from "../../services/eventService";
 
 const MAX_QUESTIONS = 15;
 const MIN_QUESTIONS = 5;
@@ -22,35 +22,74 @@ const DEFAULT_QUESTIONS = 10;
 const MAX_OPTIONS = 5;
 
 function getStatus(event) {
+  if (!event) return "upcoming";
+  if (event.status) return event.status;
   const now = new Date();
-  const start = new Date(`${event.eventDate}T${event.startTime}`);
-  const end = new Date(`${event.eventDate}T${event.endTime}`);
+  const dateStr = event.eventDate || (event.date ? new Date(event.date).toISOString().split("T")[0] : null);
+  if (!dateStr) return "upcoming";
+  const startStr = event.startTime || "09:00";
+  const endStr = event.endTime || "17:00";
+  const start = new Date(`${dateStr}T${startStr}`);
+  const end = new Date(`${dateStr}T${endStr}`);
 
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return "upcoming";
   if (now < start) return "upcoming";
   if (now <= end) return "ongoing";
   return "past";
 }
 
 function formatDate(dateStr) {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  if (!dateStr) return "N/A";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return String(dateStr);
+  }
 }
 
 function FeedbackForm() {
+  const [eventsList, setEventsList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [search, setSearch] = useState("");
   const [showEvents, setShowEvents] = useState(false);
   const searchRef = useRef(null);
 
-  const [forms, setForms] = useState(feedbackForms);
+  const [forms, setForms] = useState([]);
   const [modal, setModal] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [toast, setToast] = useState("");
 
   const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    eventService.getEvents().then((res) => {
+      if (isMounted) {
+        const events = res?.data || [];
+        setEventsList(events);
+        if (events.length > 0) {
+          setSelectedEvent(events[0]);
+          setSearch(events[0].name);
+        }
+      }
+    }).catch((err) => {
+      console.warn("Failed to load events for FeedbackForm:", err);
+      if (isMounted) setEventsList([]);
+    }).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -65,34 +104,39 @@ function FeedbackForm() {
 
   // Default selection: Nearest event chronologically to now
   const nearestEvent = useMemo(() => {
-    return [...events].sort((a, b) => {
-      const aDate = new Date(`${a.eventDate}T${a.startTime}`).getTime();
-      const bDate = new Date(`${b.eventDate}T${b.startTime}`).getTime();
-      return Math.abs(aDate - Date.now()) - Math.abs(bDate - Date.now());
+    if (!eventsList || eventsList.length === 0) return null;
+    return [...eventsList].sort((a, b) => {
+      const today = new Date().toISOString().split("T")[0];
+      const aDateStr = a.eventDate || (a.date ? new Date(a.date).toISOString().split("T")[0] : today);
+      const bDateStr = b.eventDate || (b.date ? new Date(b.date).toISOString().split("T")[0] : today);
+      const aTime = new Date(`${aDateStr}T${a.startTime || "09:00"}`).getTime() || 0;
+      const bTime = new Date(`${bDateStr}T${b.startTime || "09:00"}`).getTime() || 0;
+      return Math.abs(aTime - Date.now()) - Math.abs(bTime - Date.now());
     })[0];
-  }, []);
+  }, [eventsList]);
 
   useEffect(() => {
     if (nearestEvent && !selectedEvent) {
       setSelectedEvent(nearestEvent);
-      setSearch(nearestEvent.name);
+      setSearch(nearestEvent.name || "");
     }
   }, [nearestEvent, selectedEvent]);
 
   // Dropdown list & live typeahead
   const filteredEvents = useMemo(() => {
+    if (!eventsList) return [];
     if (
       !search.trim() ||
-      (selectedEvent && search.trim().toLowerCase() === selectedEvent.name.toLowerCase())
+      (selectedEvent && search.trim().toLowerCase() === (selectedEvent.name || "").toLowerCase())
     ) {
-      return events;
+      return eventsList;
     }
-    return events.filter((event) =>
-      event.name.toLowerCase().includes(search.toLowerCase())
+    return eventsList.filter((event) =>
+      (event.name || "").toLowerCase().includes(search.toLowerCase())
     );
-  }, [search, selectedEvent]);
+  }, [search, selectedEvent, eventsList]);
 
-  const form = forms.find((item) => item.eventId === selectedEvent?.id);
+  const form = forms.find((item) => item.eventId === (selectedEvent?._id || selectedEvent?.id));
   const status = selectedEvent ? getStatus(selectedEvent) : "";
 
   // Edit lockout: Locked during last 15 minutes of ongoing event when already active
@@ -425,36 +469,38 @@ function FeedbackForm() {
       </div>
 
       {/* Event Info Card */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-800">{selectedEvent.name}</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              {formatDate(selectedEvent.eventDate)} · {selectedEvent.startTime} -{" "}
-              {selectedEvent.endTime}
-            </p>
+      {selectedEvent ? (
+        <>
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-gray-800">{selectedEvent.name}</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {formatDate(selectedEvent.eventDate)} · {selectedEvent.startTime || "09:00 AM"} -{" "}
+                  {selectedEvent.endTime || "05:00 PM"}
+                </p>
+              </div>
+              <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium capitalize text-purple-700">
+                {status}
+              </span>
+            </div>
           </div>
-          <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium capitalize text-purple-700">
-            {status}
-          </span>
-        </div>
-      </div>
 
-      {/* Feature Flag Check: Feedback required by Admin? */}
-      {selectedEvent.feedbackRequired === false ? (
-        <EmptyBox text="This event does not include a feedback form." />
-      ) : (
-        <div className="space-y-5">
-          {/* 1. UPCOMING & UNGENERATED STATE: Create Form Box */}
-          {!form?.generated && (
-            <ActionBox
-              icon={<Plus size={26} />}
-              title="Create Feedback Form"
-              text="Create 5 to 15 questions for this event."
-              button="Create Form"
-              onClick={createForm}
-            />
-          )}
+          {/* Feature Flag Check: Feedback required by Admin? */}
+          {selectedEvent.feedbackRequired === false ? (
+            <EmptyBox text="This event does not include a feedback form." />
+          ) : (
+            <div className="space-y-5">
+              {/* 1. UPCOMING & UNGENERATED STATE: Create Form Box */}
+              {!form?.generated && (
+                <ActionBox
+                  icon={<Plus size={26} />}
+                  title="Create Feedback Form"
+                  text="Create 5 to 15 questions for this event."
+                  button="Create Form"
+                  onClick={createForm}
+                />
+              )}
 
           {/* 2. FORM ALREADY CREATED: View Form Box with Edit option */}
           {form?.generated && (
@@ -725,6 +771,16 @@ function FeedbackForm() {
                   </div>
             </>
           )}
+        </div>
+      )}
+        </>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
+          <FileText size={40} className="mx-auto text-gray-300" />
+          <h3 className="mt-4 font-semibold text-gray-700">No events available</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-gray-500">
+            Create an event in Admin to configure and publish feedback forms.
+          </p>
         </div>
       )}
 

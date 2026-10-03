@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   CalendarDays,
@@ -9,7 +10,7 @@ import {
   Clock,
   Calendar,
 } from "lucide-react";
-import { events, users, registrations, attendances } from "../../mockData";
+import { volunteerService } from "../../services/volunteerService";
 
 const quickAccessItems = [
   {
@@ -39,69 +40,95 @@ const quickAccessItems = [
 ];
 
 function Dashboard() {
-  const totalEventsCount = events.length;
-  const upcomingEventsCount = events.filter((e) => e.status === "upcoming").length;
-  const totalVolunteersCount = users.filter((u) => u.role === "volunteer").length;
-  const totalStudentsCount = users.filter((u) => u.role === "student").length;
-  const totalRegistrationsCount = registrations.filter((r) => r.status === "registered").length;
+  const [statsData, setStatsData] = useState({
+    totalEvents: 0,
+    upcomingEvents: 0,
+    totalVolunteers: 0,
+    totalStudents: 0,
+    totalRegistrations: 0,
+    attendanceRate: 0,
+    verifiedAttendances: 0,
+    upcomingList: [],
+  });
+  const [loading, setLoading] = useState(true);
 
-  const avgAttendancePercent =
-    totalRegistrationsCount > 0
-      ? Math.round((attendances.length / totalRegistrationsCount) * 100)
-      : 85;
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStats() {
+      try {
+        setLoading(true);
+        const res = await volunteerService.getDashboardStats();
+        if (isMounted && res && res.data) {
+          const d = res.data;
+          setStatsData({
+            totalEvents: d.totalEvents || 0,
+            upcomingEvents: d.upcomingEvents || 0,
+            totalVolunteers: d.totalVolunteers || 0,
+            totalStudents: d.totalStudents || 0,
+            totalRegistrations: d.totalRegistrations || 0,
+            attendanceRate: d.attendanceRate || 0,
+            verifiedAttendances: d.verifiedAttendances || d.totalAttendances || 0,
+            upcomingList: d.upcomingList || [],
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to load volunteer dashboard stats:", err.message);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadStats();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const stats = [
     {
       title: "Total Events",
-      value: String(totalEventsCount),
-      subtext: `${upcomingEventsCount} upcoming events`,
+      value: String(statsData.totalEvents),
+      subtext: `${statsData.upcomingEvents} upcoming events`,
       icon: CalendarDays,
     },
     {
       title: "Active Volunteers",
-      value: String(totalVolunteersCount),
+      value: String(statsData.totalVolunteers),
       subtext: "Assigned to active committees",
       icon: Users,
     },
     {
       title: "Registered Students",
-      value: String(totalStudentsCount),
-      subtext: `${totalRegistrationsCount} total event registrations`,
+      value: String(statsData.totalStudents),
+      subtext: `${statsData.totalRegistrations} total event registrations`,
       icon: GraduationCap,
     },
     {
       title: "Attendance Rate",
-      value: `${avgAttendancePercent}%`,
-      subtext: `${attendances.length} verified attendances`,
+      value: `${statsData.attendanceRate}%`,
+      subtext: `${statsData.verifiedAttendances} verified attendances`,
       icon: ClipboardCheck,
     },
   ];
 
-  const upcomingList = events
-    .filter((e) => e.status === "upcoming")
-    .slice(0, 4)
-    .map((event) => {
-      const eventRegCount = registrations.filter(
-        (r) => r.eventId === event.id && r.status === "registered"
-      ).length;
+  const upcomingList = (statsData.upcomingList || []).map((event) => {
+    const dateDisplay = event.eventDate || event.date
+      ? new Date(event.eventDate || event.date).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "TBD";
 
-      const dateDisplay = event.eventDate
-        ? new Date(`${event.eventDate}T00:00:00`).toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-          })
-        : "TBD";
-
-      return {
-        id: event.id,
-        title: event.eventName,
-        date: dateDisplay,
-        time: event.startTime ? `${event.startTime} - ${event.endTime}` : "10:00 AM",
-        registered: eventRegCount,
-        status: "Upcoming",
-      };
-    });
+    return {
+      id: event._id || event.id,
+      title: event.name || event.eventName || event.title,
+      date: dateDisplay,
+      time: event.startTime ? `${event.startTime} - ${event.endTime || ""}` : "10:00 AM",
+      registered: event.registeredCount || event.registered || 0,
+      status: event.status ? (event.status.charAt(0).toUpperCase() + event.status.slice(1)) : "Upcoming",
+    };
+  });
 
   return (
     <div className="space-y-6">

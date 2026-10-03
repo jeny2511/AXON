@@ -1,25 +1,13 @@
-import { users as initialUsers } from "../mockData/users";
+import apiClient, { setAuthToken, getAuthToken } from "./apiClient";
 
 const AUTH_USER_KEY = "axon_auth_user";
 const AUTH_STUDENT_KEY = "axon_auth_student_id";
 const AUTH_VOLUNTEER_KEY = "axon_volunteer_user";
-const AUTH_CUSTOM_STUDENTS_KEY = "axon_custom_students";
+const AUTH_ADMIN_KEY = "axon_admin_user";
 
-// Get runtime users list (combining mock users + dynamically registered students)
-export function getAllUsers() {
-  const customStudentsJson = localStorage.getItem(AUTH_CUSTOM_STUDENTS_KEY);
-  let customStudents = [];
-  if (customStudentsJson) {
-    try {
-      customStudents = JSON.parse(customStudentsJson);
-    } catch {
-      customStudents = [];
-    }
-  }
-  return [...initialUsers, ...customStudents];
-}
-
-// Get current authenticated user object or null
+/**
+ * Get current authenticated user object from session or null
+ */
 export function getCurrentUser() {
   const raw = localStorage.getItem(AUTH_USER_KEY);
   if (!raw) return null;
@@ -30,207 +18,190 @@ export function getCurrentUser() {
   }
 }
 
-// Check if user is logged in
+/**
+ * Check if user is logged in
+ */
 export function isLoggedIn() {
   const user = getCurrentUser();
-  return Boolean(user && user.id && user.role);
+  const token = getAuthToken();
+  return Boolean(user && (user.id || user._id) && user.role && token);
 }
 
-// Get active role: 'student' | 'volunteer' | 'admin' | null
+/**
+ * Get active role: 'student' | 'volunteer' | 'admin' | null
+ */
 export function getUserRole() {
   const user = getCurrentUser();
   return user ? user.role : null;
 }
 
-// Check if user has a specific role
+/**
+ * Check if user has a specific role
+ */
 export function hasRole(role) {
   const currentRole = getUserRole();
   return currentRole === role;
 }
 
-// Centralized Login function for all three roles (accepts username/enrollment/email & password)
-export function loginUser(credentialsOrIdentifier, password = "", preferredRole = null) {
-  let userInput = "";
+/**
+ * Request server-side registration OTP
+ */
+export async function sendRegistrationOtp(email) {
+  return await apiClient.post("/auth/send-otp", { email });
+}
+
+/**
+ * Centralized Real API Login function for all three roles
+ * Accepts identifier (Email OR Enrollment No) + password
+ */
+export async function loginUser(credentialsOrIdentifier, password = "") {
+  let identifier = "";
   let passInput = password;
 
   if (typeof credentialsOrIdentifier === "object" && credentialsOrIdentifier !== null) {
-    userInput = (
-      credentialsOrIdentifier.username ||
+    identifier = (
       credentialsOrIdentifier.identifier ||
+      credentialsOrIdentifier.username ||
       credentialsOrIdentifier.enrollmentNo ||
       credentialsOrIdentifier.enrollmentNumber ||
       credentialsOrIdentifier.email ||
       credentialsOrIdentifier.emailId ||
       ""
     ).trim();
-    passInput = credentialsOrIdentifier.password !== undefined ? credentialsOrIdentifier.password : passInput;
-    if (credentialsOrIdentifier.role) preferredRole = credentialsOrIdentifier.role;
+    passInput =
+      credentialsOrIdentifier.password !== undefined
+        ? credentialsOrIdentifier.password
+        : passInput;
   } else if (typeof credentialsOrIdentifier === "string") {
-    userInput = credentialsOrIdentifier.trim();
+    identifier = credentialsOrIdentifier.trim();
   }
 
-  if (!userInput) {
-    throw new Error("Please enter your Username, Enrollment Number, or Email ID.");
+  if (!identifier) {
+    throw new Error("Please enter your Email ID or Enrollment Number.");
+  }
+  if (!passInput) {
+    throw new Error("Please enter your password.");
   }
 
-  const query = userInput.toLowerCase();
-  const allUsers = getAllUsers();
-
-  // Find user by enrollmentNo, email, id, fullName, or username prefix
-  let matchedUser = allUsers.find((u) => {
-    const uEnroll = (u.enrollmentNo || "").toLowerCase();
-    const uEmail = (u.email || "").toLowerCase();
-    const uId = (u.id || "").toLowerCase();
-    const uName = (u.fullName || "").toLowerCase();
-    const uPrefix = uEmail.includes("@") ? uEmail.split("@")[0] : "";
-    const uUsername = (u.username || "").toLowerCase();
-
-    return (
-      uEnroll === query ||
-      uEmail === query ||
-      uId === query ||
-      uUsername === query ||
-      uPrefix === query ||
-      uName === query
-    );
+  // Call Real Backend API
+  const response = await apiClient.post("/auth/login", {
+    identifier,
+    password: passInput,
   });
 
-  // Fallback match if user typed part of name
-  if (!matchedUser) {
-    matchedUser = allUsers.find((u) => {
-      const uName = (u.fullName || "").toLowerCase();
-      const uEmail = (u.email || "").toLowerCase();
-      return uName.includes(query) || uEmail.includes(query);
-    });
-  }
+  const { token, user } = response.data;
 
-  if (!matchedUser) {
-    throw new Error("Invalid credentials. Please verify your Username, Enrollment Number, or Email ID.");
-  }
-
-  // Password validation: if user has a stored custom password, check it
-  if (matchedUser.password && passInput) {
-    if (matchedUser.password !== passInput && passInput !== "demo123" && passInput !== "password") {
-      throw new Error("Incorrect password. Please try again.");
-    }
-  }
-
-  // Set centralized session
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(matchedUser));
+  // Store token and user session
+  setAuthToken(token);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 
   // Maintain backward compatibility for existing module-specific keys
-  if (matchedUser.role === "student") {
-    localStorage.setItem(AUTH_STUDENT_KEY, matchedUser.id);
-  } else if (matchedUser.role === "volunteer") {
-    localStorage.setItem(AUTH_VOLUNTEER_KEY, JSON.stringify(matchedUser));
-  } else if (matchedUser.role === "admin") {
-    localStorage.setItem("axon_admin_user", JSON.stringify(matchedUser));
+  const resolvedId = user._id || user.id;
+  if (user.role === "student") {
+    localStorage.setItem(AUTH_STUDENT_KEY, resolvedId);
+  } else if (user.role === "volunteer") {
+    localStorage.setItem(AUTH_VOLUNTEER_KEY, JSON.stringify(user));
+  } else if (user.role === "admin") {
+    localStorage.setItem(AUTH_ADMIN_KEY, JSON.stringify(user));
   }
 
   window.dispatchEvent(new Event("axon-auth-change"));
-  return matchedUser;
+  return user;
 }
 
-// Centralized Student Registration
-export function registerStudent(studentData) {
-  if (!studentData.fullName || !studentData.fullName.trim()) {
-    throw new Error("Full name is required.");
-  }
-  if (!studentData.enrollmentNo || !studentData.enrollmentNo.trim()) {
-    throw new Error("Enrollment number is required.");
-  }
-  if (!studentData.email || !studentData.email.trim()) {
-    throw new Error("College email address is required.");
-  }
+/**
+ * Centralized Real API Student Registration
+ */
+export async function registerStudent(studentData) {
+  const response = await apiClient.post("/auth/register", studentData);
+  const { token, user } = response.data;
 
-  const allUsers = getAllUsers();
-  const trimmedEnroll = studentData.enrollmentNo.trim();
-  const trimmedEmail = studentData.email.trim().toLowerCase();
+  // Store token and user session
+  setAuthToken(token);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 
-  // Check if already registered
-  const existingUser = allUsers.find(
-    (u) =>
-      (u.enrollmentNo && u.enrollmentNo.toLowerCase() === trimmedEnroll.toLowerCase()) ||
-      (u.email && u.email.toLowerCase() === trimmedEmail)
-  );
+  const resolvedId = user._id || user.id;
+  localStorage.setItem(AUTH_STUDENT_KEY, resolvedId);
 
-  if (existingUser) {
-    throw new Error("An account with this enrollment number or email already exists. Please sign in.");
-  }
+  window.dispatchEvent(new Event("axon-auth-change"));
+  return user;
+}
 
-  const studentCount = allUsers.filter((u) => u.role === "student").length;
-  const newStudentId = `ST${String(studentCount + 1).padStart(3, "0")}`;
-
-  const department = studentData.department || "IT";
-  const courseType = studentData.courseType || studentData.admissionType || "Regular";
-  const year = Number(studentData.year) || (courseType === "D2D" ? 2 : 1);
-  const semester = Number(studentData.semester) || (year * 2 - 1);
-  const batch = studentData.batch || "2024-2028";
-
-  const newStudent = {
-    id: newStudentId,
-    studentId: newStudentId,
-    role: "student",
-    fullName: studentData.fullName.trim(),
-    email: trimmedEmail,
-    department,
-    courseType,
-    admissionType: courseType.toLowerCase(),
-    year,
-    semester,
-    enrollmentNo: trimmedEnroll,
-    phone: studentData.phone?.trim() || studentData.phoneNumber?.trim() || "9876543210",
-    batch,
-    profilePhoto: "/assets/images/profile/default.jpg",
-    isActive: true,
-  };
-
-  // Save to custom students list
-  const customStudentsJson = localStorage.getItem(AUTH_CUSTOM_STUDENTS_KEY);
-  let customStudents = [];
-  if (customStudentsJson) {
-    try {
-      customStudents = JSON.parse(customStudentsJson);
-    } catch {
-      customStudents = [];
+/**
+ * Fetch fresh current user session from backend
+ */
+export async function getMe() {
+  try {
+    const response = await apiClient.get("/auth/me");
+    const user = response.data.user;
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    return user;
+  } catch (err) {
+    if (err.status === 401) {
+      logout();
     }
+    throw err;
   }
-  customStudents.push(newStudent);
-  localStorage.setItem(AUTH_CUSTOM_STUDENTS_KEY, JSON.stringify(customStudents));
-
-  // Log in as the new student
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newStudent));
-  localStorage.setItem(AUTH_STUDENT_KEY, newStudent.id);
-  window.dispatchEvent(new Event("axon-auth-change"));
-
-  return newStudent;
 }
 
-// Global Logout function
+/**
+ * Fetch live User Profile
+ */
+export async function getUserProfile() {
+  const response = await apiClient.get("/users/profile");
+  return response.data.user;
+}
+
+/**
+ * Update User Profile
+ */
+export async function updateUserProfile(profileData) {
+  const response = await apiClient.put("/users/profile", profileData);
+  const updatedUser = response.data.user;
+  const current = getCurrentUser() || {};
+  const merged = { ...current, ...updatedUser };
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(merged));
+  window.dispatchEvent(new Event("axon-auth-change"));
+  return merged;
+}
+
+/**
+ * Change Password
+ */
+export async function changeUserPassword(passwordData) {
+  return await apiClient.put("/users/change-password", passwordData);
+}
+
+/**
+ * Global Logout function
+ */
 export function logout() {
+  setAuthToken(null);
   localStorage.removeItem(AUTH_USER_KEY);
   localStorage.removeItem(AUTH_STUDENT_KEY);
   localStorage.removeItem(AUTH_VOLUNTEER_KEY);
-  localStorage.removeItem("axon_admin_user");
+  localStorage.removeItem(AUTH_ADMIN_KEY);
   window.dispatchEvent(new Event("axon-auth-change"));
 }
 
-// Backwards compatibility helpers for student module
+// Backwards compatibility helpers
 export function getCurrentStudentId() {
   const user = getCurrentUser();
-  return user && user.role === "student" ? user.id : localStorage.getItem(AUTH_STUDENT_KEY) || null;
+  return user && user.role === "student"
+    ? user._id || user.id
+    : localStorage.getItem(AUTH_STUDENT_KEY) || null;
 }
 
 export function getLoggedInUser() {
   return getCurrentUser();
 }
 
-export function loginStudent(identifier, password) {
-  return loginUser(identifier, password, "student");
+export async function loginStudent(identifier, password) {
+  return await loginUser(identifier, password);
 }
 
-export function signupStudent(studentData) {
-  return registerStudent(studentData);
+export async function signupStudent(studentData) {
+  return await registerStudent(studentData);
 }
 
 export function logoutStudent() {
@@ -243,6 +214,6 @@ export const getAuthStudentId = getCurrentStudentId;
 export const login = loginUser;
 export function isStudentAuthenticated() {
   const user = getCurrentUser();
-  return Boolean(user && user.role === "student");
+  return Boolean(user && user.role === "student" && getAuthToken());
 }
 

@@ -16,8 +16,7 @@ import {
   X,
 } from "lucide-react";
 
-import { users } from "../../mockData";
-import { logout } from "../../services/authService";
+import { logout, getAuthUser } from "../../services/authService";
 
 const menuItems = [
   {
@@ -140,26 +139,10 @@ function Sidebar({ isOpen, onClose }) {
         {/* -------------------------------- */}
 
         {(() => {
-          let currentVolunteer = null;
-          try {
-            const stored = localStorage.getItem("axon_volunteer_user");
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              currentVolunteer = users.find(
-                (u) => u.id === parsed.id || u.enrollmentNo === parsed.enrollmentNo
-              );
-            }
-          } catch (e) {}
-
-          if (!currentVolunteer) {
-            currentVolunteer =
-              users.find((u) => u.id === "VL002") ||
-              users.find((u) => u.role === "volunteer");
-          }
-
-          const name = currentVolunteer?.fullName || "Dhruvi Patel";
-          const initial = name[0] || "D";
-          const designation = currentVolunteer?.designation || "President";
+          const currentVolunteer = getAuthUser();
+          const name = currentVolunteer?.fullName || currentVolunteer?.name || "Volunteer";
+          const initial = name[0] || "V";
+          const designation = currentVolunteer?.designation || "Executive";
 
           return (
             <div className="mx-3 mb-4 rounded-lg bg-[#332568] px-3 py-2.5">

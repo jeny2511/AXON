@@ -1,187 +1,37 @@
-// import { useEffect, useState } from "react";
-// import { Users } from "lucide-react";
-
-// import { users } from "../../mockData";
-
-// function Volunteers() {
-//   const [volunteers, setVolunteers] = useState([]);
-
-//   useEffect(() => {
-//     const mockVolunteers = users.filter(
-//       (user) => user.role === "volunteer"
-//     );
-
-//     const addedVolunteers =
-//       JSON.parse(
-//         localStorage.getItem("axonVolunteers")
-//       ) || [];
-
-//     setVolunteers([
-//       ...mockVolunteers,
-//       ...addedVolunteers,
-//     ]);
-//   }, []);
-
-//   return (
-//     <main className="dashboard">
-
-//       <div className="page-heading">
-
-//         <div>
-//           <h2>Volunteer Management</h2>
-
-//           <p>
-//             View and manage all volunteers
-//           </p>
-//         </div>
-
-//       </div>
-
-
-//       <div className="volunteer-count">
-
-//         <Users size={18} />
-
-//         <span>
-//           <strong>
-//             {volunteers.length}
-//           </strong>{" "}
-//           Volunteers
-//         </span>
-
-//       </div>
-
-
-//       <section className="volunteer-grid">
-
-//         {volunteers.map((volunteer) => (
-
-//           <div
-//             className="volunteer-card"
-//             key={volunteer.id}
-//           >
-
-//             <div className="volunteer-image">
-
-//               <img
-//                 src={
-//                   volunteer.profilePhoto ||
-//                   "/assets/images/profile/default.jpg"
-//                 }
-//                 alt={volunteer.fullName}
-//               />
-
-//             </div>
-
-
-//             <div className="volunteer-details">
-
-//               <h3>
-//                 {volunteer.fullName}
-//               </h3>
-
-//               <p>
-//                 <strong>ID:</strong>{" "}
-//                 {volunteer.id}
-//               </p>
-
-//               <p>
-//                 <strong>Email:</strong>{" "}
-//                 {volunteer.email}
-//               </p>
-
-//               <p>
-//                 <strong>Branch:</strong>{" "}
-//                 {volunteer.department}
-//               </p>
-
-//               <p>
-//                 <strong>Year:</strong>{" "}
-//                 {volunteer.year}
-//               </p>
-
-//               <p>
-//                 <strong>Phone:</strong>{" "}
-//                 {volunteer.phone}
-//               </p>
-
-//               {volunteer.committee && (
-//                 <p>
-//                   <strong>Committee:</strong>{" "}
-//                   {volunteer.committee}
-//                 </p>
-//               )}
-
-//             </div>
-
-
-//             <div className="volunteer-status">
-
-//               <span className="status-dot active"></span>
-
-//               Active
-
-//             </div>
-
-//           </div>
-
-//         ))}
-
-//       </section>
-
-//     </main>
-//   );
-// }
-
-// export default Volunteers;
 import { useEffect, useState } from "react";
 import {
   Edit,
   Trash2,
   Users,
   UserPlus,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-import { users } from "../../mockData";
-
-const STORAGE_KEY = "axonVolunteers";
+import { adminService } from "../../services/adminService";
 
 function Volunteers() {
   const navigate = useNavigate();
   const [volunteers, setVolunteers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const loadVolunteers = () => {
-    const storedVolunteers =
-      JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-
-    // Keep localStorage as the source of truth once it has been initialized.
-    if (storedVolunteers.length > 0) {
-      setVolunteers(storedVolunteers);
-      return;
+  const loadVolunteers = async () => {
+    try {
+      setLoading(true);
+      const res = await adminService.getUsers({ role: "volunteer" });
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setVolunteers(list.filter((u) => u.role === "volunteer"));
+      setError(null);
+    } catch (err) {
+      console.error("Failed to load volunteers:", err);
+      setError(err.message || "Failed to load volunteers from server.");
+    } finally {
+      setLoading(false);
     }
-
-    const mockVolunteers = users.filter(
-      (user) => user.role === "volunteer"
-    );
-
-    setVolunteers(mockVolunteers);
   };
 
   useEffect(() => {
-    const storedVolunteers = localStorage.getItem(STORAGE_KEY);
-
-    if (!storedVolunteers) {
-      const mockVolunteers = users.filter(
-        (user) => user.role === "volunteer"
-      );
-
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(mockVolunteers)
-      );
-    }
-
     loadVolunteers();
   }, []);
 
@@ -189,7 +39,7 @@ function Volunteers() {
     navigate(`/admin/add-volunteer?edit=${encodeURIComponent(id)}`);
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete ${name}?`
     );
@@ -198,16 +48,28 @@ function Volunteers() {
       return;
     }
 
-    const updatedVolunteers = volunteers.filter(
-      (volunteer) => volunteer.id !== id
-    );
+    try {
+      await adminService.deleteUser(id);
+      setVolunteers((prev) => prev.filter((v) => (v._id || v.id) !== id));
+    } catch (err) {
+      alert(err.message || "Failed to delete volunteer.");
+    }
+  };
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(updatedVolunteers)
-    );
-
-    setVolunteers(updatedVolunteers);
+  const handleToggleStatus = async (volunteer) => {
+    const newStatus = volunteer.accountStatus === "active" ? "suspended" : "active";
+    try {
+      await adminService.updateUserStatus(volunteer._id || volunteer.id, newStatus);
+      setVolunteers((prev) =>
+        prev.map((v) =>
+          (v._id || v.id) === (volunteer._id || volunteer.id)
+            ? { ...v, accountStatus: newStatus }
+            : v
+        )
+      );
+    } catch (err) {
+      alert(err.message || "Failed to update status.");
+    }
   };
 
   return (
@@ -230,14 +92,24 @@ function Volunteers() {
 
       <div className="volunteer-count">
         <Users size={18} />
-
         <span>
-          <strong>{volunteers.length}</strong>{" "}
-          Volunteers
+          <strong>{volunteers.length}</strong> Volunteers
         </span>
       </div>
 
-      {volunteers.length === 0 ? (
+      {error && (
+        <div style={{ color: "#ef4444", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: "2rem", textAlign: "center", color: "#94a3b8" }}>
+          <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 0.5rem" }} />
+          <p>Loading volunteers...</p>
+        </div>
+      ) : volunteers.length === 0 ? (
         <div className="volunteer-empty-state">
           <Users size={36} />
           <h3>No volunteers found</h3>
@@ -254,103 +126,90 @@ function Volunteers() {
         </div>
       ) : (
         <section className="volunteer-grid">
-          {volunteers.map((volunteer) => (
-            <div
-              className="volunteer-card"
-              key={volunteer.id}
-            >
-              <div className="volunteer-image">
-                <img
-                  src={
-                    volunteer.profilePhoto ||
-                    "/assets/images/profile/default.jpg"
-                  }
-                  alt={volunteer.fullName}
-                />
-              </div>
+          {volunteers.map((volunteer) => {
+            const vId = volunteer._id || volunteer.id;
+            const isVolunteerActive = volunteer.accountStatus === "active";
 
-              <div className="volunteer-details">
-                <h3>{volunteer.fullName}</h3>
+            return (
+              <div className="volunteer-card" key={vId}>
+                <div className="volunteer-image">
+                  <img
+                    src={
+                      volunteer.profilePhoto ||
+                      "/assets/images/profile/default.jpg"
+                    }
+                    alt={volunteer.fullName}
+                  />
+                </div>
 
-                <p>
-                  <strong>ID:</strong>{" "}
-                  {volunteer.id}
-                </p>
+                <div className="volunteer-details">
+                  <h3>{volunteer.fullName}</h3>
 
-                <p>
-                  <strong>Email:</strong>{" "}
-                  {volunteer.email}
-                </p>
-
-                <p>
-                  <strong>Branch:</strong>{" "}
-                  {volunteer.department}
-                </p>
-
-                <p>
-                  <strong>Year:</strong>{" "}
-                  {volunteer.year}
-                </p>
-
-                <p>
-                  <strong>Phone:</strong>{" "}
-                  {volunteer.phone}
-                </p>
-
-                {volunteer.committee && (
                   <p>
-                    <strong>Committee:</strong>{" "}
-                    {volunteer.committee}
+                    <strong>ID / Enroll:</strong>{" "}
+                    {volunteer.enrollmentNumber || vId}
                   </p>
-                )}
-              </div>
 
-              <div className="volunteer-status-row">
-                <div className="volunteer-status">
-                  <span
-                    className={`status-dot ${
-                      volunteer.isActive === false
-                        ? "inactive"
-                        : "active"
-                    }`}
-                  ></span>
+                  <p>
+                    <strong>Email:</strong> {volunteer.email}
+                  </p>
 
-                  {volunteer.isActive === false
-                    ? "Inactive"
-                    : "Active"}
+                  <p>
+                    <strong>Branch:</strong>{" "}
+                    {volunteer.department}
+                  </p>
+
+                  <p>
+                    <strong>Semester:</strong>{" "}
+                    {volunteer.semester || volunteer.year || "N/A"}
+                  </p>
+
+                  <p>
+                    <strong>Phone:</strong>{" "}
+                    {volunteer.phoneNumber || volunteer.phone || "N/A"}
+                  </p>
+
+                  {volunteer.committeePosition && (
+                    <p>
+                      <strong>Committee:</strong>{" "}
+                      {volunteer.committeePosition?.name ||
+                        volunteer.committeePosition?.title ||
+                        volunteer.committee ||
+                        "Core Team"}
+                    </p>
+                  )}
                 </div>
 
-                <div className="volunteer-actions">
-                  <button
-                    type="button"
-                    className="volunteer-edit-button"
-                    onClick={() =>
-                      handleEdit(volunteer.id)
-                    }
-                    title="Edit volunteer"
+                <div className="volunteer-status-row">
+                  <div
+                    className="volunteer-status"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleToggleStatus(volunteer)}
+                    title="Click to toggle status"
                   >
-                    <Edit size={14} />
-                    Edit
-                  </button>
+                    <span
+                      className={`status-dot ${
+                        isVolunteerActive ? "active" : "inactive"
+                      }`}
+                    ></span>
+                    {isVolunteerActive ? "Active" : "Suspended"}
+                  </div>
 
-                  <button
-                    type="button"
-                    className="volunteer-delete-button"
-                    onClick={() =>
-                      handleDelete(
-                        volunteer.id,
-                        volunteer.fullName
-                      )
-                    }
-                    title="Delete volunteer"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
+                  <div className="volunteer-actions">
+                    <button
+                      type="button"
+                      className="volunteer-delete-button"
+                      onClick={() => handleDelete(vId, volunteer.fullName)}
+                      title="Delete volunteer"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       )}
     </main>

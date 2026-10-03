@@ -1,17 +1,70 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./pages.css";
 import "./LearningHub.css";
 import StudentLayout from "../layouts/StudentLayout";
 import SearchBar from "../components/SearchBar/SearchBar";
 import EmptyState from "../components/EmptyState/EmptyState";
-import { getLearningResources } from "../services/studentService";
+import { fetchLearningResourcesApi, getLearningResources } from "../services/studentService";
 
 function LearningHub() {
-  const learningResources = getLearningResources();
-
+  const [learningResources, setLearningResources] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [readingResource, setReadingResource] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadResources() {
+      try {
+        setLoading(true);
+        const data = await fetchLearningResourcesApi();
+        if (isMounted && data && Array.isArray(data)) {
+          const formatted = data.map((res) => ({
+            resourceId: res._id || res.resourceId,
+            _id: res._id,
+            title: res.title,
+            description: res.description || "",
+            category: res.category ? (res.category.charAt(0).toUpperCase() + res.category.slice(1)) : "Article",
+            rawCategory: res.category || "article",
+            contentType: res.contentType || "article",
+            content: res.content || "",
+            pdfUrl: res.pdfUrl || "",
+            externalUrl: res.externalUrl || res.resourceLink || "",
+            imageUrl: res.imageUrl || "",
+            videoUrl: res.videoUrl || "",
+            thumbnail: res.thumbnail || res.imageUrl || "",
+            readTime: res.readTime || "5 min read",
+            tags: res.tags || [],
+            isFeatured: Boolean(res.isFeatured),
+            author: res.author || "TCF Editorial Team",
+            publishedDate: res.publishedDate
+              ? new Date(res.publishedDate).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "Recent",
+          }));
+          setLearningResources(formatted);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to load learning resources from API:", err.message);
+      }
+
+      if (isMounted) {
+        setLearningResources([]);
+        setLoading(false);
+      }
+    }
+
+    loadResources();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const categories = [
     "All",
@@ -21,7 +74,8 @@ function LearningHub() {
   const filteredResources = learningResources.filter((resource) => {
     const matchesCategory =
       selectedCategory === "All" ||
-      resource.category === selectedCategory;
+      resource.category === selectedCategory ||
+      resource.rawCategory === selectedCategory.toLowerCase();
 
     const term = search.toLowerCase().trim();
     const matchesSearch =
@@ -69,9 +123,13 @@ function LearningHub() {
         </div>
 
         <div className="learning-grid">
-          {filteredResources.length > 0 ? (
+          {loading ? (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px 0", color: "#64748b" }}>
+              Loading learning articles and cybersecurity resources...
+            </div>
+          ) : filteredResources.length > 0 ? (
             filteredResources.map((resource) => (
-              <div className="learning-card" key={resource.resourceId}>
+              <div className="learning-card" key={resource.resourceId || resource._id}>
                 {resource.thumbnail && (
                   <img
                     src={resource.thumbnail}
@@ -162,13 +220,41 @@ function LearningHub() {
               <div style={{ color: "#334155", lineHeight: 1.8, fontSize: "15px" }}>
                 <p><strong>Summary:</strong> {readingResource.description}</p>
                 <hr style={{ border: "none", borderTop: "1px solid #e2e8f0", margin: "16px 0" }} />
-                <p>
-                  This educational material is curated by The Cyber Force (TCF) technical committee to provide practical cybersecurity knowledge for students at Vishwakarma Government Engineering College.
-                </p>
-                <p>
-                  Key learning points include identifying attack vectors, understanding proactive defensive measures, and implementing security best practices in academic and real-world projects.
-                </p>
+                {readingResource.content ? (
+                  <p>{readingResource.content}</p>
+                ) : (
+                  <>
+                    <p>
+                      This educational material is curated by The Cyber Force (TCF) technical committee to provide practical cybersecurity knowledge for students at Vishwakarma Government Engineering College.
+                    </p>
+                    <p>
+                      Key learning points include identifying attack vectors, understanding proactive defensive measures, and implementing security best practices in academic and real-world projects.
+                    </p>
+                  </>
+                )}
               </div>
+
+              {readingResource.externalUrl && readingResource.externalUrl !== "#" && (
+                <div style={{ marginTop: "16px" }}>
+                  <a
+                    href={readingResource.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-block",
+                      background: "#6a3bc5",
+                      color: "#ffffff",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      textDecoration: "none",
+                      fontWeight: "600",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Open External Resource ↗
+                  </a>
+                </div>
+              )}
 
               {readingResource.tags && (
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "18px" }}>
